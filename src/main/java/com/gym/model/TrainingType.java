@@ -1,15 +1,10 @@
 package com.gym.model;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Getter
-@Setter
-@AllArgsConstructor
-@NoArgsConstructor
-public class TrainingType {
 
-    String trainingTypeName;
+public enum TrainingType {
+
+    YOGA, STRENGTH, HIIT, CARDIO, PILATES
 }

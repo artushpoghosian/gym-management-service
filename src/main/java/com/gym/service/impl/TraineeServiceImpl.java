@@ -1,6 +1,7 @@
 package com.gym.service.impl;
 
 import com.gym.dao.TraineeDao;
+import com.gym.dao.TrainerDao;
 import com.gym.model.Trainee;
 import com.gym.service.TraineeService;
 import com.gym.utilities.UserUtils;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +20,7 @@ import java.util.Optional;
 public class TraineeServiceImpl implements TraineeService {
 
     private TraineeDao traineeDao;
+    private TrainerDao trainerDao;
     private UserUtils userUtils;
 
     @Autowired
@@ -30,10 +33,19 @@ public class TraineeServiceImpl implements TraineeService {
         this.userUtils = userUtils;
     }
 
+    @Autowired
+    public void setTrainerDao(TrainerDao trainerDao) {
+        this.trainerDao = trainerDao;
+    }
+
     @Override
     public Trainee create(Trainee trainee) {
         log.info("Creating Trainee: {} {}", trainee.getFirstName(), trainee.getLastName());
-        String username = userUtils.generateUsername(trainee.getFirstName(), trainee.getLastName());
+
+        Predicate<String> usernameExists = username ->
+                traineeDao.existsByUsername(username) || trainerDao.existsByUsername(username);
+
+        String username = userUtils.generateUsername(trainee.getFirstName(), trainee.getLastName(), usernameExists);
         String password = userUtils.generatePassword();
 
         trainee.setUsername(username);
@@ -50,9 +62,9 @@ public class TraineeServiceImpl implements TraineeService {
     }
 
     @Override
-    public void delete(Long id) {
-        log.info("Deleting Trainee with id: {}", id);
-        traineeDao.delete(id);
+    public void delete(String username) {
+        log.info("Deleting Trainee with username: {}", username);
+        traineeDao.delete(username);
     }
 
     @Override
@@ -62,9 +74,8 @@ public class TraineeServiceImpl implements TraineeService {
     }
 
     @Override
-    public Optional<Trainee> selectTrainee(Long id) {
-        log.info("Selecting Trainee with id: {}", id);
-        return traineeDao.findById(id);
+    public Optional<Trainee> selectTrainee(String username) {
+        log.info("Selecting Trainee with Username: {}", username);
+        return traineeDao.findById(username);
     }
-
 }

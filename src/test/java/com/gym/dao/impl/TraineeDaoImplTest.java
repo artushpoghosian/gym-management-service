@@ -62,37 +62,49 @@ class TraineeDaoImplTest {
     }
 
     @Test
-    void delete_ShouldRemoveTrainee_ById() {
+    void delete_ShouldRemoveTrainee_ByUsername() {
         storage.put("alice.brown", trainee);
 
-        traineeDao.delete(1L);
+        traineeDao.delete("alice.brown");
 
         assertThat(storage).doesNotContainKey("alice.brown");
     }
 
     @Test
-    void delete_ShouldDoNothing_WhenIdNotFound() {
+    void delete_ShouldDoNothing_WhenUsernameNotFound() {
         storage.put("alice.brown", trainee);
 
-        traineeDao.delete(99L);
+        traineeDao.delete("unknown.user");
 
         assertThat(storage).containsKey("alice.brown");
     }
 
     @Test
-    void findById_ShouldReturnTrainee_WhenExists() {
+    void findByUsername_ShouldReturnTrainee_WhenExists() {
         storage.put("alice.brown", trainee);
 
-        Optional<Trainee> result = traineeDao.findById(1L);
+        Optional<Trainee> result = traineeDao.findById("alice.brown");
 
         assertThat(result).isPresent().contains(trainee);
     }
 
     @Test
-    void findById_ShouldReturnEmpty_WhenNotExists() {
-        Optional<Trainee> result = traineeDao.findById(99L);
+    void findByUsername_ShouldReturnEmpty_WhenNotExists() {
+        Optional<Trainee> result = traineeDao.findById("unknown.user");
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void existsByUsername_ShouldReturnTrue_WhenExists() {
+        storage.put("alice.brown", trainee);
+
+        assertThat(traineeDao.existsByUsername("alice.brown")).isTrue();
+    }
+
+    @Test
+    void existsByUsername_ShouldReturnFalse_WhenNotExists() {
+        assertThat(traineeDao.existsByUsername("unknown.user")).isFalse();
     }
 
     @Test

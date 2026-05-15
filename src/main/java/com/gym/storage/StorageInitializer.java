@@ -109,7 +109,8 @@ public class StorageInitializer implements BeanPostProcessor {
                 training.setTrainerId(Long.parseLong(parts[1].trim()));
                 training.setTraineeId(Long.parseLong(parts[2].trim()));
                 training.setTrainingName(parts[3].trim());
-                training.setTrainingType(new TrainingType(parts[4].trim()));
+                String typeString = parts[4].trim().toUpperCase();
+                training.setTrainingType(TrainingType.valueOf(typeString));
                 training.setTrainingDate(LocalDate.parse(parts[5].trim()));
                 training.setTrainingDuration(Integer.parseInt(parts[6].trim()));
                 storage.put(training.getTrainingName(), training);

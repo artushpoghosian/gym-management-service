@@ -36,7 +36,7 @@ class TrainingServiceImplTest {
         training.setTrainerId(1L);
         training.setTraineeId(1L);
         training.setTrainingName("Morning Yoga");
-        training.setTrainingType(new TrainingType("Yoga"));
+        training.setTrainingType(TrainingType.YOGA);
         training.setTrainingDate(LocalDate.of(2024, 6, 1));
         training.setTrainingDuration(60);
     }
@@ -53,13 +53,6 @@ class TrainingServiceImplTest {
     }
 
     @Test
-    void delete_ShouldDelegateToDao() {
-        trainingService.delete(1L);
-
-        verify(trainingDao).delete(1L);
-    }
-
-    @Test
     void findAll_ShouldReturnAllTrainings() {
         when(trainingDao.findAll()).thenReturn(List.of(training));
 
@@ -71,19 +64,21 @@ class TrainingServiceImplTest {
 
     @Test
     void selectTraining_ShouldReturnTraining_WhenExists() {
-        when(trainingDao.findById(1L)).thenReturn(Optional.of(training));
+        when(trainingDao.findByName("Morning Yoga")).thenReturn(Optional.of(training));
 
-        Optional<Training> result = trainingService.selectTraining(1L);
+        Optional<Training> result = trainingService.selectTraining("Morning Yoga");
 
         assertThat(result).isPresent().contains(training);
+        verify(trainingDao).findByName("Morning Yoga");
     }
 
     @Test
     void selectTraining_ShouldReturnEmpty_WhenNotExists() {
-        when(trainingDao.findById(99L)).thenReturn(Optional.empty());
+        when(trainingDao.findByName("Unknown")).thenReturn(Optional.empty());
 
-        Optional<Training> result = trainingService.selectTraining(99L);
+        Optional<Training> result = trainingService.selectTraining("Unknown");
 
         assertThat(result).isEmpty();
+        verify(trainingDao).findByName("Unknown");
     }
 }

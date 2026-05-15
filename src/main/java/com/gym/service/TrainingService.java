@@ -8,7 +8,6 @@ import java.util.Optional;
 public interface TrainingService {
 
     Training create(Training training);
-    void delete(Long id);
     List<Training> findAll();
-    Optional<Training> selectTraining(Long id);
+    Optional<Training> selectTraining(String trainingName);
 }

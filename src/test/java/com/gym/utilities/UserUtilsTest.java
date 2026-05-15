@@ -2,18 +2,13 @@ package com.gym.utilities;
 
 import com.gym.dao.TraineeDao;
 import com.gym.dao.TrainerDao;
-import com.gym.model.Trainee;
-import com.gym.model.Trainer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class UserUtilsTest {
@@ -29,49 +24,29 @@ class UserUtilsTest {
 
     @Test
     void generateUsername_ShouldConcatenateFirstAndLastName_WithDot() {
-        String username = userUtils.generateUsername("John", "Smith");
+        String username = userUtils.generateUsername("John", "Smith", u -> false);
 
         assertThat(username).isEqualTo("john.smith");
     }
 
     @Test
     void generateUsername_ShouldBeLowercase() {
-        String username = userUtils.generateUsername("ALICE", "BROWN");
+        String username = userUtils.generateUsername("ALICE", "BROWN", u -> false);
 
         assertThat(username).isEqualTo("alice.brown");
     }
 
     @Test
-    void generateUsername_WhenDuplicateExistsInTrainers_ShouldAppendSuffix() {
-        Trainer existing = new Trainer();
-        existing.setUsername("john.smith");
-        when(trainerDao.findAll()).thenReturn(List.of(existing));
-
-        String username = userUtils.generateUsername("John", "Smith");
+    void generateUsername_WhenBaseUsernameTaken_ShouldAddSuffix1() {
+        String username = userUtils.generateUsername("John", "Smith", u -> u.equals("john.smith"));
 
         assertThat(username).isEqualTo("john.smith1");
     }
 
     @Test
-    void generateUsername_WhenDuplicateExistsInTrainees_ShouldAppendSuffix() {
-        Trainee existing = new Trainee();
-        existing.setUsername("john.smith");
-        when(traineeDao.findAll()).thenReturn(List.of(existing));
-
-        String username = userUtils.generateUsername("John", "Smith");
-
-        assertThat(username).isEqualTo("john.smith1");
-    }
-
-    @Test
-    void generateUsername_WhenMultipleDuplicatesExist_ShouldIncrementSuffix() {
-        Trainer t1 = new Trainer();
-        t1.setUsername("john.smith");
-        Trainer t2 = new Trainer();
-        t2.setUsername("john.smith1");
-        when(trainerDao.findAll()).thenReturn(List.of(t1, t2));
-
-        String username = userUtils.generateUsername("John", "Smith");
+    void generateUsername_WhenBaseAndSuffix1Taken_ShouldAddSuffix2() {
+        String username = userUtils.generateUsername("John", "Smith",
+                u -> u.equals("john.smith") || u.equals("john.smith1"));
 
         assertThat(username).isEqualTo("john.smith2");
     }

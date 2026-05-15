@@ -1,6 +1,7 @@
 package com.gym.service.impl;
 
 import com.gym.dao.TraineeDao;
+import com.gym.dao.TrainerDao;
 import com.gym.model.Trainee;
 import com.gym.utilities.UserUtils;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,8 +14,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -23,6 +27,9 @@ class TraineeServiceImplTest {
 
     @Mock
     private TraineeDao traineeDao;
+
+    @Mock
+    private TrainerDao trainerDao;
 
     @Mock
     private UserUtils userUtils;
@@ -44,7 +51,8 @@ class TraineeServiceImplTest {
 
     @Test
     void create_ShouldSetUsernamePasswordAndActive_AndSave() {
-        when(userUtils.generateUsername("Alice", "Brown")).thenReturn("alice.brown");
+        when(userUtils.generateUsername(eq("Alice"), eq("Brown"), any(Predicate.class)))
+                .thenReturn("alice.brown");
         when(userUtils.generatePassword()).thenReturn("pass123456");
         when(traineeDao.save(trainee)).thenReturn(trainee);
 
@@ -53,6 +61,19 @@ class TraineeServiceImplTest {
         assertThat(result.getUsername()).isEqualTo("alice.brown");
         assertThat(result.getPassword()).isEqualTo("pass123456");
         assertThat(result.isActive()).isTrue();
+        verify(traineeDao).save(trainee);
+    }
+
+    @Test
+    void create_WhenDuplicateName_ShouldUseSuffixedUsername() {
+        when(userUtils.generateUsername(eq("Alice"), eq("Brown"), any(Predicate.class)))
+                .thenReturn("alice.brown1");
+        when(userUtils.generatePassword()).thenReturn("pass123456");
+        when(traineeDao.save(trainee)).thenReturn(trainee);
+
+        Trainee result = traineeService.create(trainee);
+
+        assertThat(result.getUsername()).isEqualTo("alice.brown1");
         verify(traineeDao).save(trainee);
     }
 
@@ -69,9 +90,11 @@ class TraineeServiceImplTest {
 
     @Test
     void delete_ShouldDelegateToDao() {
-        traineeService.delete(1L);
+        String username = "alice.brown";
 
-        verify(traineeDao).delete(1L);
+        traineeService.delete(username);
+
+        verify(traineeDao).delete(username);
     }
 
     @Test
@@ -86,19 +109,23 @@ class TraineeServiceImplTest {
 
     @Test
     void selectTrainee_ShouldReturnTrainee_WhenExists() {
-        when(traineeDao.findById(1L)).thenReturn(Optional.of(trainee));
+        String username = "alice.brown";
+        when(traineeDao.findById(username)).thenReturn(Optional.of(trainee));
 
-        Optional<Trainee> result = traineeService.selectTrainee(1L);
+        Optional<Trainee> result = traineeService.selectTrainee(username);
 
         assertThat(result).isPresent().contains(trainee);
+        verify(traineeDao).findById(username);
     }
 
     @Test
     void selectTrainee_ShouldReturnEmpty_WhenNotExists() {
-        when(traineeDao.findById(99L)).thenReturn(Optional.empty());
+        String username = "unknown.user";
+        when(traineeDao.findById(username)).thenReturn(Optional.empty());
 
-        Optional<Trainee> result = traineeService.selectTrainee(99L);
+        Optional<Trainee> result = traineeService.selectTrainee(username);
 
         assertThat(result).isEmpty();
+        verify(traineeDao).findById(username);
     }
 }

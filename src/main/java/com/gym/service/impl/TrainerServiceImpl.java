@@ -1,5 +1,6 @@
 package com.gym.service.impl;
 
+import com.gym.dao.TraineeDao;
 import com.gym.dao.TrainerDao;
 import com.gym.model.Trainer;
 import com.gym.service.TrainerService;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 @Service
 @RequiredArgsConstructor
@@ -18,11 +20,17 @@ import java.util.Optional;
 public class TrainerServiceImpl implements TrainerService {
 
     private TrainerDao trainerDao;
+    private TraineeDao traineeDao;
     private UserUtils userUtils;
 
     @Autowired
     public void setTrainerDao(TrainerDao trainerDao) {
         this.trainerDao = trainerDao;
+    }
+
+    @Autowired
+    public void setTrainerDao(TraineeDao traineeDao) {
+        this.traineeDao = traineeDao;
     }
 
     @Autowired
@@ -34,7 +42,11 @@ public class TrainerServiceImpl implements TrainerService {
     @Override
     public Trainer create(Trainer trainer) {
         log.info("Creating Trainer: {} {}", trainer.getFirstName(), trainer.getLastName());
-        String username = userUtils.generateUsername(trainer.getFirstName(), trainer.getLastName());
+
+        Predicate<String> usernameExists = username ->
+                trainerDao.existsByUsername(username) || traineeDao.existsByUsername(username);
+
+        String username = userUtils.generateUsername(trainer.getFirstName(), trainer.getLastName(), usernameExists);
         String password = userUtils.generatePassword();
 
         trainer.setUsername(username);
@@ -50,19 +62,14 @@ public class TrainerServiceImpl implements TrainerService {
     }
 
     @Override
-    public void delete(Long id) {
-        log.info("Deleting Trainer with id: {}", id);
-        trainerDao.delete(id);
-    }
-
-    @Override
     public List<Trainer> findAll() {
         log.info("Finding all Trainers");
         return trainerDao.findAll();
     }
 
     @Override
-    public Optional<Trainer> selectTrainer(Long id) {
-        return trainerDao.findById(id);
+    public Optional<Trainer> selectTrainer(String username) {
+        log.info("Selecting Trainer with Username: {}", username);
+        return trainerDao.findById(username);
     }
 }

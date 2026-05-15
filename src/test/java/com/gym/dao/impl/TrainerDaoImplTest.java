@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class TrainerDaoImplTest {
 
@@ -23,7 +22,7 @@ class TrainerDaoImplTest {
     void setUp() {
         storage = new HashMap<>();
         trainerDao = new TrainerDaoImpl();
-        trainerDao.setTraineeStorage(storage);
+        trainerDao.setTrainerStorage(storage);
 
         trainer = new Trainer();
         trainer.setId(1L);
@@ -61,33 +60,31 @@ class TrainerDaoImplTest {
     }
 
     @Test
-    void delete_ShouldRemoveTrainer_ById() {
+    void findByUsername_ShouldReturnTrainer_WhenExists() {
         storage.put("john.smith", trainer);
 
-        trainerDao.delete(1L);
-
-        assertThat(storage).doesNotContainKey("john.smith");
-    }
-
-    @Test
-    void delete_ShouldThrowException_WhenIdNotFound() {
-        assertThrows(Exception.class, () -> trainerDao.delete(99L));
-    }
-
-    @Test
-    void findById_ShouldReturnTrainer_WhenExists() {
-        storage.put("john.smith", trainer);
-
-        Optional<Trainer> result = trainerDao.findById(1L);
+        Optional<Trainer> result = trainerDao.findById("john.smith");
 
         assertThat(result).isPresent().contains(trainer);
     }
 
     @Test
-    void findById_ShouldReturnEmpty_WhenNotExists() {
-        Optional<Trainer> result = trainerDao.findById(99L);
+    void findByUsername_ShouldReturnEmpty_WhenNotExists() {
+        Optional<Trainer> result = trainerDao.findById("unknown.user");
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void existsByUsername_ShouldReturnTrue_WhenExists() {
+        storage.put("john.smith", trainer);
+
+        assertThat(trainerDao.existsByUsername("john.smith")).isTrue();
+    }
+
+    @Test
+    void existsByUsername_ShouldReturnFalse_WhenNotExists() {
+        assertThat(trainerDao.existsByUsername("unknown.user")).isFalse();
     }
 
     @Test

@@ -6,9 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 @Component
 @Slf4j
@@ -27,16 +26,12 @@ public class UserUtils {
         this.traineeDao = traineeDao;
     }
 
-    public String generateUsername(String firstName, String lastName) {
+    public String generateUsername(String firstName, String lastName, Predicate<String> usernameExists) {
         final String baseUsername = firstName.toLowerCase() + "." + lastName.toLowerCase();
-
-        List<String> existingUsernames = new ArrayList<>();
-        trainerDao.findAll().forEach(t -> existingUsernames.add(t.getUsername()));
-        traineeDao.findAll().forEach(t -> existingUsernames.add(t.getUsername()));
 
         String username = baseUsername;
         int s = 1;
-        while (existingUsernames.contains(username)) {
+        while (usernameExists.test(username)) {
             username = baseUsername + s;
             s++;
         }

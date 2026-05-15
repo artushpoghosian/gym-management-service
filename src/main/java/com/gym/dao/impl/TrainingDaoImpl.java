@@ -18,40 +18,22 @@ public class TrainingDaoImpl implements TrainingDao {
     private Map<String, Training> trainingStorage;
 
     @Autowired
-    public void setTraineeStorage(@Qualifier("trainingStorage") Map<String, Training> trainingStorage) {
+    public void setTrainingStorage(@Qualifier("trainingStorage") Map<String, Training> trainingStorage) {
         this.trainingStorage = trainingStorage;
     }
 
     @Override
     public Training save(Training training) {
-        String key = training.getTrainingName();
-        log.debug("Saving training with name key: {}", key);
-        trainingStorage.put(key, training);
+        String trainingName = training.getTrainingName();
+        log.debug("Saving training with name key: {}", trainingName);
+        trainingStorage.put(trainingName, training);
         return training;
     }
 
     @Override
-    public Training update(Training training) {
-        String key = training.getTrainingName();
-        if (trainingStorage.containsKey(key)) {
-            log.debug("Updating training key: {}", key);
-            trainingStorage.put(key, training);
-            return training;
-        }
-        return null;
-    }
-
-    @Override
-    public void delete(Long id) {
-        String key = trainingStorage.values().stream().filter(t -> t.getId().equals(id)).findFirst().get().getTrainingName();
-        log.debug("Deleting training with name key: {}", key);
-        trainingStorage.remove(key);
-    }
-
-    @Override
-    public Optional<Training> findById(Long id) {
-        log.info("Finding training with id: {}", id);
-        return trainingStorage.values().stream().filter(t -> t.getId().equals(id)).findFirst();
+    public Optional<Training> findByName(String trainingName) {
+        log.info("Finding training with name: {}", trainingName);
+        return Optional.ofNullable(trainingStorage.get(trainingName));
     }
 
     @Override

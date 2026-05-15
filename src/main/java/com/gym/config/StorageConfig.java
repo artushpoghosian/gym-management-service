@@ -25,7 +25,7 @@ public class StorageConfig {
     }
 
     @Bean(name = "trainingStorage")
-    public Map<String, Training> trainingStorage() {
+    public Map<String , Training> trainingStorage() {
         return new HashMap<>();
     }
 }

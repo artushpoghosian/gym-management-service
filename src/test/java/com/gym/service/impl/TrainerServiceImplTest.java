@@ -1,5 +1,6 @@
 package com.gym.service.impl;
 
+import com.gym.dao.TraineeDao;
 import com.gym.dao.TrainerDao;
 import com.gym.model.Trainer;
 import com.gym.utilities.UserUtils;
@@ -12,8 +13,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -22,6 +26,9 @@ class TrainerServiceImplTest {
 
     @Mock
     private TrainerDao trainerDao;
+
+    @Mock
+    private TraineeDao traineeDao;
 
     @Mock
     private UserUtils userUtils;
@@ -42,7 +49,8 @@ class TrainerServiceImplTest {
 
     @Test
     void create_ShouldSetUsernamePasswordAndActive_AndSave() {
-        when(userUtils.generateUsername("John", "Smith")).thenReturn("john.smith");
+        when(userUtils.generateUsername(eq("John"), eq("Smith"), any(Predicate.class)))
+                .thenReturn("john.smith");
         when(userUtils.generatePassword()).thenReturn("rand123456");
         when(trainerDao.save(trainer)).thenReturn(trainer);
 
@@ -56,13 +64,15 @@ class TrainerServiceImplTest {
 
     @Test
     void create_WhenDuplicateName_ShouldUseSuffixedUsername() {
-        when(userUtils.generateUsername("John", "Smith")).thenReturn("john.smith1");
+        when(userUtils.generateUsername(eq("John"), eq("Smith"), any(Predicate.class)))
+                .thenReturn("john.smith1");
         when(userUtils.generatePassword()).thenReturn("rand123456");
         when(trainerDao.save(trainer)).thenReturn(trainer);
 
         Trainer result = trainerService.create(trainer);
 
         assertThat(result.getUsername()).isEqualTo("john.smith1");
+        verify(trainerDao).save(trainer);
     }
 
     @Test
@@ -77,13 +87,6 @@ class TrainerServiceImplTest {
     }
 
     @Test
-    void delete_ShouldDelegateToDao() {
-        trainerService.delete(1L);
-
-        verify(trainerDao).delete(1L);
-    }
-
-    @Test
     void findAll_ShouldReturnAllTrainers() {
         when(trainerDao.findAll()).thenReturn(List.of(trainer));
 
@@ -95,19 +98,23 @@ class TrainerServiceImplTest {
 
     @Test
     void selectTrainer_ShouldReturnTrainer_WhenExists() {
-        when(trainerDao.findById(1L)).thenReturn(Optional.of(trainer));
+        String username = "john.smith";
+        when(trainerDao.findById(username)).thenReturn(Optional.of(trainer));
 
-        Optional<Trainer> result = trainerService.selectTrainer(1L);
+        Optional<Trainer> result = trainerService.selectTrainer(username);
 
         assertThat(result).isPresent().contains(trainer);
+        verify(trainerDao).findById(username);
     }
 
     @Test
     void selectTrainer_ShouldReturnEmpty_WhenNotExists() {
-        when(trainerDao.findById(99L)).thenReturn(Optional.empty());
+        String username = "nonexistent.user";
+        when(trainerDao.findById(username)).thenReturn(Optional.empty());
 
-        Optional<Trainer> result = trainerService.selectTrainer(99L);
+        Optional<Trainer> result = trainerService.selectTrainer(username);
 
         assertThat(result).isEmpty();
+        verify(trainerDao).findById(username);
     }
 }

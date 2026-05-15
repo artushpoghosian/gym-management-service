@@ -18,7 +18,7 @@ public class TrainerDaoImpl implements TrainerDao {
     private Map<String, Trainer> trainerStorage;
 
     @Autowired
-    public void setTraineeStorage(@Qualifier("trainerStorage") Map<String, Trainer> trainerStorage) {
+    public void setTrainerStorage(@Qualifier("trainerStorage") Map<String, Trainer> trainerStorage) {
         this.trainerStorage = trainerStorage;
     }
 
@@ -42,16 +42,15 @@ public class TrainerDaoImpl implements TrainerDao {
     }
 
     @Override
-    public void delete(Long id) {
-        String key = trainerStorage.values().stream().filter(t -> t.getId().equals(id)).findFirst().get().getUsername();
-        log.debug("Deleting trainer with username key: {}", key);
-        trainerStorage.remove(key);
+    public void delete(String username) {
+        log.debug("Deleting trainer with username: {}", username);
+        trainerStorage.remove(username);
     }
 
     @Override
-    public Optional<Trainer> findById(Long id) {
-        log.info("Finding trainer with id: {}", id);
-        return trainerStorage.values().stream().filter(t -> t.getId().equals(id)).findFirst();
+    public Optional<Trainer> findById(String username) {
+        log.info("Finding trainer with username: {}", username);
+        return Optional.ofNullable(trainerStorage.get(username));
     }
 
     @Override
@@ -61,5 +60,11 @@ public class TrainerDaoImpl implements TrainerDao {
             return List.copyOf(trainerStorage.values());
         }
         return List.of();
+    }
+
+    @Override
+    public boolean existsByUsername(String username) {
+        log.debug("Checking if username: {} exists", username);
+        return trainerStorage.containsKey(username);
     }
 }

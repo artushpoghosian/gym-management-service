@@ -35,14 +35,14 @@ public class GymFacade {
         return traineeService.update(trainee);
     }
 
-    public void deleteTrainee(Long id) {
-        log.info("Facade: deleting trainee with id: {}", id);
-        traineeService.delete(id);
+    public void deleteTrainee(String username) {
+        log.info("Facade: deleting trainee with username: {}", username);
+        traineeService.delete(username);
     }
 
-    public Optional<Trainee> selectTrainee(Long id) {
-        log.info("Facade: selecting trainee with id: {}", id);
-        return traineeService.selectTrainee(id);
+    public Optional<Trainee> selectTrainee(String username) {
+        log.info("Facade: selecting trainee with username: {}", username);
+        return traineeService.selectTrainee(username);
     }
 
     public List<Trainee> findAllTrainees() {
@@ -59,9 +59,9 @@ public class GymFacade {
         return trainerService.update(trainer);
     }
 
-    public Optional<Trainer> selectTrainer(Long id) {
-        log.info("Facade: selecting trainer with id: {}", id);
-        return trainerService.selectTrainer(id);
+    public Optional<Trainer> selectTrainer(String username) {
+        log.info("Facade: selecting trainer with Username: {}", username);
+        return trainerService.selectTrainer(username);
     }
 
     public List<Trainer> findAllTrainers() {
@@ -75,13 +75,5 @@ public class GymFacade {
 
     public List<Training> findAllTrainings() {
         return trainingService.findAll();
-    }
-
-    public String generateUsername(String firstName, String lastName) {
-        return userUtils.generateUsername(firstName, lastName);
-    }
-
-    public String generatePassword() {
-        return userUtils.generatePassword();
     }
 }

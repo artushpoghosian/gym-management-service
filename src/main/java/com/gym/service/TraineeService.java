@@ -9,8 +9,7 @@ public interface TraineeService {
 
     Trainee create(Trainee trainee);
     Trainee update(Trainee trainee);
-    void delete(Long id);
+    void delete(String username);
     List<Trainee> findAll();
-    Optional<Trainee> selectTrainee(Long id);
-
+    Optional<Trainee> selectTrainee(String username);
 }

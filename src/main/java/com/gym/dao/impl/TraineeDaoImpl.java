@@ -42,20 +42,15 @@ public class TraineeDaoImpl implements TraineeDao {
     }
 
     @Override
-    public void delete(Long id) {
-        traineeStorage.values().stream()
-                .filter(t -> t.getId().equals(id))
-                .findFirst()
-                .ifPresent(t -> {
-                    log.debug("Deleting trainee: {}", t.getUsername());
-                    traineeStorage.remove(t.getUsername());
-                });
+    public void delete(String username) {
+        log.debug("Deleting trainee with username: {}", username);
+        traineeStorage.remove(username);
     }
 
     @Override
-    public Optional<Trainee> findById(Long id) {
-        log.info("Finding trainee with id: {}", id);
-        return traineeStorage.values().stream().filter(t -> t.getId().equals(id)).findFirst();
+    public Optional<Trainee> findById(String username) {
+        log.info("Finding trainee with username: {}", username);
+        return Optional.ofNullable(traineeStorage.get(username));
     }
 
     @Override
@@ -65,5 +60,11 @@ public class TraineeDaoImpl implements TraineeDao {
             return List.copyOf(traineeStorage.values());
         }
         return List.of();
+    }
+
+    @Override
+    public boolean existsByUsername(String username) {
+        log.debug("Checking if username: {} exists", username);
+        return traineeStorage.containsKey(username);
     }
 }

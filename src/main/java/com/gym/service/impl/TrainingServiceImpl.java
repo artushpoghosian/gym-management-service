@@ -30,20 +30,15 @@ public class TrainingServiceImpl implements TrainingService {
     }
 
     @Override
-    public void delete(Long id) {
-        log.info("Deleting Training with id: {}", id);
-        trainingDao.delete(id);
-    }
-
-    @Override
     public List<Training> findAll() {
         log.info("Finding all Trainings");
         return trainingDao.findAll();
     }
 
     @Override
-    public Optional<Training> selectTraining(Long id) {
-        log.info("Selecting Training with id: {}", id);
-        return trainingDao.findById(id);
+    public Optional<Training> selectTraining(String trainingName) {
+        log.info("Finding Training with name: {}", trainingName);
+        return trainingDao.findByName(trainingName);
     }
+
 }

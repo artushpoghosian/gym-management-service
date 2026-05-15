@@ -9,8 +9,6 @@ public interface TrainerService {
 
     Trainer create(Trainer trainer);
     Trainer update(Trainer trainer);
-    void delete(Long id);
     List<Trainer> findAll();
-    Optional<Trainer> selectTrainer(Long id);
-
+    Optional<Trainer> selectTrainer(String username);
 }
