@@ -7,7 +7,8 @@ import java.util.Optional;
 
 public interface TrainingService {
 
-    Training create(Training training);
+    Training create(String authUsername, String authPassword, Training training);
+    Optional<Training> findByName(String trainingName);
     List<Training> findAll();
     Optional<Training> selectTraining(String trainingName);
 }

@@ -2,46 +2,48 @@ package com.gym.dao.impl;
 
 import com.gym.dao.TrainingDao;
 import com.gym.model.Training;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Repository
 @Slf4j
 public class TrainingDaoImpl implements TrainingDao {
 
-    private Map<String, Training> trainingStorage;
-
-    @Autowired
-    public void setTrainingStorage(@Qualifier("trainingStorage") Map<String, Training> trainingStorage) {
-        this.trainingStorage = trainingStorage;
-    }
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Override
+    @Transactional
     public Training save(Training training) {
-        String trainingName = training.getTrainingName();
-        log.debug("Saving training with name key: {}", trainingName);
-        trainingStorage.put(trainingName, training);
-        return training;
+        log.debug("Saving training with name: {}", training.getTrainingName());
+        if (training.getId() == null) {
+            entityManager.persist(training);
+            return training;
+        }
+        return entityManager.merge(training);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Training> findByName(String trainingName) {
         log.info("Finding training with name: {}", trainingName);
-        return Optional.ofNullable(trainingStorage.get(trainingName));
+        List<Training> result = entityManager
+                .createQuery("SELECT t FROM Training t WHERE t.trainingName = :name", Training.class)
+                .setParameter("name", trainingName)
+                .getResultList();
+        return result.isEmpty() ? Optional.empty() : Optional.of(result.get(0));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Training> findAll() {
         log.info("Finding all trainings");
-        if (trainingStorage != null) {
-            return List.copyOf(trainingStorage.values());
-        }
-        return List.of();
+        return entityManager.createQuery("SELECT t FROM Training t", Training.class).getResultList();
     }
 }
