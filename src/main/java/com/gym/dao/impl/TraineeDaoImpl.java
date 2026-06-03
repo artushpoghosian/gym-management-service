@@ -143,14 +143,14 @@ public class TraineeDaoImpl implements TraineeDao {
         return entityManager.createQuery(cq).getResultList();
     }
 
-
     @Override
     @Transactional(readOnly = true)
     public List<Trainer> findTrainersNotAssignedToTrainee(String username) {
-        log.info("Fetching unassigned trainers for trainee: {}", username);
+        log.info("Fetching unassigned trainers for trainee via training records: {}", username);
         return entityManager.createQuery(
-                        "SELECT tr FROM Trainer tr WHERE tr NOT IN " +
-                                "(SELECT t FROM Trainee tn JOIN tn.trainers t WHERE tn.username = :username)",
+                        "SELECT tr FROM Trainer tr " +
+                                "LEFT JOIN Training tg ON tg.trainer = tr AND tg.trainee.username = :username " +
+                                "WHERE tg.id IS NULL",
                         Trainer.class)
                 .setParameter("username", username)
                 .getResultList();
@@ -159,10 +159,29 @@ public class TraineeDaoImpl implements TraineeDao {
     @Override
     @Transactional
     public void updateTraineeTrainers(String username, List<Trainer> trainers) {
-        log.info("Updating trainers collection for trainee: {}", username);
+        log.info("Updating trainers via training assignments for trainee: {}", username);
+
         findById(username).ifPresent(trainee -> {
-            trainee.setTrainers(trainers);
-            entityManager.merge(trainee);
+            for (Trainer trainer : trainers) {
+
+                Long count = entityManager.createQuery(
+                                "SELECT COUNT(t) FROM Training t WHERE t.trainee.username = :tUsername AND t.trainer.username = :trUsername",
+                                Long.class)
+                        .setParameter("tUsername", username)
+                        .setParameter("trUsername", trainer.getUsername())
+                        .getSingleResult();
+
+                if (count == 0) {
+                    Training training = new Training();
+                    training.setTrainee(trainee);
+                    training.setTrainer(trainer);
+                    training.setTrainingName("Default Assignment Session");
+                    training.setTrainingType(trainer.getSpecialization());
+                    training.setTrainingDate(LocalDate.now());
+                    training.setTrainingDuration(60);
+                    entityManager.persist(training);
+                }
+            }
         });
     }
 }

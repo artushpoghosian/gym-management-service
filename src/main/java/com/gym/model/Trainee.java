@@ -21,7 +21,6 @@ import java.util.List;
 
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
 @Entity
 @Table(name = "trainees")
@@ -33,16 +32,4 @@ public class Trainee extends User{
 
     @Column(name = "address")
     private String address;
-
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "trainee_trainer",
-            joinColumns = @JoinColumn(name = "trainee_id"),
-            inverseJoinColumns = @JoinColumn(name = "trainer_id")
-    )
-    private List<Trainer> trainers = new ArrayList<>();
-
-    @OneToMany(mappedBy = "trainee", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<Training> trainings = new ArrayList<>();
-
 }

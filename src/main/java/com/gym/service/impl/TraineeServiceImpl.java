@@ -153,7 +153,7 @@ public class TraineeServiceImpl implements TraineeService {
         log.info("Updating trainers list for trainee: {}", targetUsername);
         authenticate(authUsername, authPassword);
 
-        traineeDao.findById(targetUsername)
+        Trainee trainee = traineeDao.findById(targetUsername)
                 .orElseThrow(() -> new ValidationException("Trainee not found: " + targetUsername));
 
         List<Trainer> resolvedTrainers = trainerUsernames.stream()
@@ -163,7 +163,7 @@ public class TraineeServiceImpl implements TraineeService {
 
         traineeDao.updateTraineeTrainers(targetUsername, resolvedTrainers);
 
-        return traineeDao.findById(targetUsername).orElseThrow();
+        return trainee;
     }
 
     @Override

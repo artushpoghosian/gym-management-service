@@ -5,7 +5,9 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrimaryKeyJoinColumn;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
@@ -19,7 +21,6 @@ import java.util.List;
 
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
 @Entity
 @Table(name = "trainers")
@@ -30,7 +31,4 @@ public class Trainer extends User{
     @Enumerated(EnumType.STRING)
     @Column(name = "specialization_id", nullable = false)
     private TrainingType specialization;
-
-    @ManyToMany(mappedBy = "trainers", fetch = FetchType.LAZY)
-    private List<Trainee> trainees = new ArrayList<>();
 }
