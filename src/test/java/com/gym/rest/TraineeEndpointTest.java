@@ -1,0 +1,911 @@
+package com.gym.rest;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.gym.exception.AuthenticationException;
+import com.gym.exception.GlobalExceptionHandler;
+import com.gym.facade.GymFacade;
+import com.gym.model.Trainee;
+import com.gym.model.Trainer;
+import com.gym.model.Training;
+import com.gym.model.TrainingType;
+import com.gym.rest.dto.trainee.TraineeRegistrationRequestDto;
+import com.gym.rest.dto.trainee.TraineeStatusPatchDto;
+import com.gym.rest.dto.trainee.TraineeUpdateRequestDto;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
+import static org.hamcrest.Matchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@WebMvcTest(TraineeEndpoint.class)
+@Import(GlobalExceptionHandler.class)
+@DisplayName("TraineeEndpoint Tests")
+class TraineeEndpointTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private GymFacade gymFacade;
+
+    private ObjectMapper objectMapper;
+
+    private static final String BASE_URL = "/trainees";
+    private static final String AUTH_USER = "john.doe";
+    private static final String AUTH_PASS = "secret123";
+    private static final String TARGET_USERNAME = "jane.smith";
+
+    @BeforeEach
+    void setUp() {
+        objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+    }
+
+    private Trainee buildTrainee(String username) {
+        Trainee t = new Trainee();
+        t.setUsername(username);
+        t.setFirstName("Jane");
+        t.setLastName("Smith");
+        t.setDateOfBirth(LocalDate.of(1990, 5, 20));
+        t.setAddress("123 Main St");
+        t.setActive(true);
+        t.setPassword("generatedPass");
+        return t;
+    }
+
+    private TraineeRegistrationRequestDto buildRegisterRequest() {
+        TraineeRegistrationRequestDto dto = new TraineeRegistrationRequestDto();
+        dto.setFirstName("Jane");
+        dto.setLastName("Smith");
+        dto.setDateOfBirth(LocalDate.of(1990, 5, 20));
+        dto.setAddress("123 Main St");
+        return dto;
+    }
+
+    private TraineeUpdateRequestDto buildUpdateRequest() {
+        TraineeUpdateRequestDto dto = new TraineeUpdateRequestDto();
+        dto.setFirstName("Jane");
+        dto.setLastName("Smith");
+        dto.setDateOfBirth(LocalDate.of(1990, 5, 20));
+        dto.setAddress("456 New Ave");
+        dto.setIsActive(true);
+        return dto;
+    }
+
+    @Nested
+    @DisplayName("POST /trainees — Register Trainee")
+    class RegisterTrainee {
+
+        @Test
+        @DisplayName("Valid request → 200 OK with generated username & password")
+        void validRequest_returns200WithCredentials() throws Exception {
+            Trainee created = buildTrainee(TARGET_USERNAME);
+            when(gymFacade.createTrainee(any(Trainee.class))).thenReturn(created);
+
+            mockMvc.perform(post(BASE_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(buildRegisterRequest())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.username").value(TARGET_USERNAME))
+                    .andExpect(jsonPath("$.password").value("generatedPass"));
+
+            verify(gymFacade).createTrainee(any(Trainee.class));
+        }
+
+        @Test
+        @DisplayName("Missing firstName → 400 with field error")
+        void missingFirstName_returns400() throws Exception {
+            TraineeRegistrationRequestDto dto = buildRegisterRequest();
+            dto.setFirstName(null);
+
+            mockMvc.perform(post(BASE_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(dto)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.firstName").value("First name is required"));
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Blank firstName → 400 with field error")
+        void blankFirstName_returns400() throws Exception {
+            TraineeRegistrationRequestDto dto = buildRegisterRequest();
+            dto.setFirstName("   ");
+
+            mockMvc.perform(post(BASE_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(dto)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.firstName").exists());
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Missing lastName → 400 with field error")
+        void missingLastName_returns400() throws Exception {
+            TraineeRegistrationRequestDto dto = buildRegisterRequest();
+            dto.setLastName(null);
+
+            mockMvc.perform(post(BASE_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(dto)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.lastName").value("Last name is required"));
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Both firstName and lastName blank → 400 with two field errors")
+        void bothNamesMissing_returns400WithTwoErrors() throws Exception {
+            TraineeRegistrationRequestDto dto = new TraineeRegistrationRequestDto();
+
+            mockMvc.perform(post(BASE_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(dto)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.firstName").exists())
+                    .andExpect(jsonPath("$.lastName").exists());
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Optional fields (dateOfBirth, address) absent → 200 OK")
+        void optionalFieldsAbsent_returns200() throws Exception {
+            TraineeRegistrationRequestDto dto = new TraineeRegistrationRequestDto();
+            dto.setFirstName("Jane");
+            dto.setLastName("Smith");
+
+            Trainee created = buildTrainee(TARGET_USERNAME);
+            when(gymFacade.createTrainee(any(Trainee.class))).thenReturn(created);
+
+            mockMvc.perform(post(BASE_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(dto)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.username").value(TARGET_USERNAME));
+        }
+
+        @Test
+        @DisplayName("Facade throws RuntimeException → 500 Internal Server Error")
+        void facadeThrowsException_returns500() throws Exception {
+            when(gymFacade.createTrainee(any(Trainee.class)))
+                    .thenThrow(new RuntimeException("DB failure"));
+
+            mockMvc.perform(post(BASE_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(buildRegisterRequest())))
+                    .andExpect(status().isInternalServerError());
+        }
+
+        @Test
+        @DisplayName("Malformed JSON body → 400")
+        void malformedJson_returns400() throws Exception {
+            mockMvc.perform(post(BASE_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{ not-valid-json"))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(gymFacade);
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /trainees/{username} — Get Profile")
+    class GetTraineeProfile {
+
+        @Test
+        @DisplayName("Valid auth headers & existing username → 200 OK with profile")
+        void validRequest_returns200WithProfile() throws Exception {
+            Trainee trainee = buildTrainee(TARGET_USERNAME);
+            when(gymFacade.selectTrainee(AUTH_USER, AUTH_PASS, TARGET_USERNAME))
+                    .thenReturn(Optional.of(trainee));
+
+            mockMvc.perform(get(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.firstName").value("Jane"))
+                    .andExpect(jsonPath("$.lastName").value("Smith"))
+                    .andExpect(jsonPath("$.address").value("123 Main St"))
+                    .andExpect(jsonPath("$.active").value(true))
+                    .andExpect(jsonPath("$.trainers").isArray());
+
+            verify(gymFacade).selectTrainee(AUTH_USER, AUTH_PASS, TARGET_USERNAME);
+        }
+
+        @Test
+        @DisplayName("Trainee not found → 500 (RuntimeException from orElseThrow)")
+        void traineeNotFound_returns500() throws Exception {
+            when(gymFacade.selectTrainee(AUTH_USER, AUTH_PASS, "ghost"))
+                    .thenReturn(Optional.empty());
+
+            mockMvc.perform(get(BASE_URL + "/{username}", "ghost")
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS))
+                    .andExpect(status().isInternalServerError());
+        }
+
+        @Test
+        @DisplayName("Missing X-Auth-Username header → 400")
+        void missingAuthUsernameHeader_returns400() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Password", AUTH_PASS))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Missing X-Auth-Password header → 400")
+        void missingAuthPasswordHeader_returns400() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Both auth headers missing → 400")
+        void bothHeadersMissing_returns400() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/{username}", TARGET_USERNAME))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Facade throws AuthenticationException → 401")
+        void facadeThrowsAuthException_returns401() throws Exception {
+            when(gymFacade.selectTrainee(anyString(), anyString(), anyString()))
+                    .thenThrow(new AuthenticationException("Invalid credentials"));
+
+            mockMvc.perform(get(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", "wrongPass"))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(content().string("Invalid credentials"));
+        }
+
+        @Test
+        @DisplayName("Response contains empty trainers list when none assigned")
+        void emptyTrainersList_inResponse() throws Exception {
+            Trainee trainee = buildTrainee(TARGET_USERNAME);
+            when(gymFacade.selectTrainee(AUTH_USER, AUTH_PASS, TARGET_USERNAME))
+                    .thenReturn(Optional.of(trainee));
+
+            mockMvc.perform(get(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.trainers", hasSize(0)));
+        }
+    }
+
+    @Nested
+    @DisplayName("PUT /trainees/{username} — Update Profile")
+    class UpdateTraineeProfile {
+
+        @Test
+        @DisplayName("Valid request → 200 OK with updated profile")
+        void validRequest_returns200WithUpdatedProfile() throws Exception {
+            Trainee updated = buildTrainee(TARGET_USERNAME);
+            updated.setAddress("456 New Ave");
+            when(gymFacade.updateTrainee(eq(AUTH_USER), eq(AUTH_PASS), any(Trainee.class)))
+                    .thenReturn(updated);
+
+            mockMvc.perform(put(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(buildUpdateRequest())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.firstName").value("Jane"))
+                    .andExpect(jsonPath("$.lastName").value("Smith"))
+                    .andExpect(jsonPath("$.address").value("456 New Ave"))
+                    .andExpect(jsonPath("$.active").value(true));
+
+            verify(gymFacade).updateTrainee(eq(AUTH_USER), eq(AUTH_PASS), any(Trainee.class));
+        }
+
+        @Test
+        @DisplayName("Missing firstName in body → 400")
+        void missingFirstName_returns400() throws Exception {
+            TraineeUpdateRequestDto dto = buildUpdateRequest();
+            dto.setFirstName(null);
+
+            mockMvc.perform(put(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(dto)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.firstName").value("First name is required"));
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Missing lastName in body → 400")
+        void missingLastName_returns400() throws Exception {
+            TraineeUpdateRequestDto dto = buildUpdateRequest();
+            dto.setLastName(null);
+
+            mockMvc.perform(put(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(dto)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.lastName").value("Last name is required"));
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Null isActive in body → 400")
+        void nullIsActive_returns400() throws Exception {
+            TraineeUpdateRequestDto dto = buildUpdateRequest();
+            dto.setIsActive(null);
+
+            mockMvc.perform(put(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(dto)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.isActive").value("Is Active status is required"));
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Missing auth headers → 400")
+        void missingHeaders_returns400() throws Exception {
+            mockMvc.perform(put(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(buildUpdateRequest())))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Facade throws AuthenticationException → 401")
+        void facadeThrowsAuthException_returns401() throws Exception {
+            when(gymFacade.updateTrainee(anyString(), anyString(), any(Trainee.class)))
+                    .thenThrow(new AuthenticationException("Unauthorized"));
+
+            mockMvc.perform(put(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", "wrongPass")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(buildUpdateRequest())))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("Username in path is passed to the trainee object")
+        void usernameFromPath_isSetOnTrainee() throws Exception {
+            Trainee updated = buildTrainee(TARGET_USERNAME);
+            when(gymFacade.updateTrainee(eq(AUTH_USER), eq(AUTH_PASS), any(Trainee.class)))
+                    .thenReturn(updated);
+
+            mockMvc.perform(put(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(buildUpdateRequest())))
+                    .andExpect(status().isOk());
+
+            verify(gymFacade).updateTrainee(eq(AUTH_USER), eq(AUTH_PASS),
+                    argThat(t -> TARGET_USERNAME.equals(t.getUsername())));
+        }
+    }
+
+    @Nested
+    @DisplayName("DELETE /trainees/{username} — Delete Trainee")
+    class DeleteTrainee {
+
+        @Test
+        @DisplayName("Valid auth + existing username → 200 OK, empty body")
+        void validRequest_returns200() throws Exception {
+            doNothing().when(gymFacade).deleteTrainee(AUTH_USER, AUTH_PASS, TARGET_USERNAME);
+
+            mockMvc.perform(delete(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(""));
+
+            verify(gymFacade).deleteTrainee(AUTH_USER, AUTH_PASS, TARGET_USERNAME);
+        }
+
+        @Test
+        @DisplayName("Missing X-Auth-Username header → 400")
+        void missingUsernameHeader_returns400() throws Exception {
+            mockMvc.perform(delete(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Password", AUTH_PASS))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Missing X-Auth-Password header → 400")
+        void missingPasswordHeader_returns400() throws Exception {
+            mockMvc.perform(delete(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Facade throws AuthenticationException → 401")
+        void facadeThrowsAuthException_returns401() throws Exception {
+            doThrow(new AuthenticationException("Unauthorized"))
+                    .when(gymFacade).deleteTrainee(anyString(), anyString(), anyString());
+
+            mockMvc.perform(delete(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", "badPass"))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(content().string("Unauthorized"));
+        }
+
+        @Test
+        @DisplayName("Facade throws RuntimeException → 500")
+        void facadeThrowsRuntimeException_returns500() throws Exception {
+            doThrow(new RuntimeException("DB error"))
+                    .when(gymFacade).deleteTrainee(anyString(), anyString(), anyString());
+
+            mockMvc.perform(delete(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS))
+                    .andExpect(status().isInternalServerError());
+        }
+
+        @Test
+        @DisplayName("Delete is idempotent — facade called exactly once")
+        void deleteDelegatesExactlyOnce() throws Exception {
+            doNothing().when(gymFacade).deleteTrainee(anyString(), anyString(), anyString());
+
+            mockMvc.perform(delete(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS))
+                    .andExpect(status().isOk());
+
+            verify(gymFacade, times(1)).deleteTrainee(AUTH_USER, AUTH_PASS, TARGET_USERNAME);
+        }
+    }
+
+    @Nested
+    @DisplayName("PATCH /trainees/{username}/status — Update Status")
+    class UpdateTraineeStatus {
+
+        private TraineeStatusPatchDto buildStatusDto(Boolean active) {
+            TraineeStatusPatchDto dto = new TraineeStatusPatchDto();
+            dto.setIsActive(active);
+            return dto;
+        }
+
+        @Test
+        @DisplayName("Activate trainee → 200 OK")
+        void activateTrainee_returns200() throws Exception {
+            doNothing().when(gymFacade).setTraineeActive(AUTH_USER, AUTH_PASS, TARGET_USERNAME, true);
+
+            mockMvc.perform(patch(BASE_URL + "/{username}/status", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(buildStatusDto(true))))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(""));
+
+            verify(gymFacade).setTraineeActive(AUTH_USER, AUTH_PASS, TARGET_USERNAME, true);
+        }
+
+        @Test
+        @DisplayName("Deactivate trainee → 200 OK")
+        void deactivateTrainee_returns200() throws Exception {
+            doNothing().when(gymFacade).setTraineeActive(AUTH_USER, AUTH_PASS, TARGET_USERNAME, false);
+
+            mockMvc.perform(patch(BASE_URL + "/{username}/status", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(buildStatusDto(false))))
+                    .andExpect(status().isOk());
+
+            verify(gymFacade).setTraineeActive(AUTH_USER, AUTH_PASS, TARGET_USERNAME, false);
+        }
+
+        @Test
+        @DisplayName("Null isActive in body → 400")
+        void nullIsActive_returns400() throws Exception {
+            mockMvc.perform(patch(BASE_URL + "/{username}/status", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"isActive\": null}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.isActive").value("Is Active status is required"));
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Missing isActive field → 400")
+        void missingIsActive_returns400() throws Exception {
+            mockMvc.perform(patch(BASE_URL + "/{username}/status", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Missing auth headers → 400")
+        void missingHeaders_returns400() throws Exception {
+            mockMvc.perform(patch(BASE_URL + "/{username}/status", TARGET_USERNAME)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(buildStatusDto(true))))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Facade throws AuthenticationException → 401")
+        void facadeThrowsAuthException_returns401() throws Exception {
+            doThrow(new AuthenticationException("Unauthorized"))
+                    .when(gymFacade).setTraineeActive(anyString(), anyString(), anyString(), anyBoolean());
+
+            mockMvc.perform(patch(BASE_URL + "/{username}/status", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", "wrong")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(buildStatusDto(true))))
+                    .andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /trainees/{username}/trainers/not-assigned — Unassigned Trainers")
+    class GetUnassignedTrainers {
+
+        private Trainer buildTrainer(String username) {
+            Trainer t = new Trainer();
+            t.setUsername(username);
+            t.setFirstName("Bob");
+            t.setLastName("Builder");
+            t.setSpecialization(TrainingType.CARDIO);
+            return t;
+        }
+
+        @Test
+        @DisplayName("Trainers exist → 200 OK with list")
+        void unassignedTrainersExist_returns200WithList() throws Exception {
+            List<Trainer> trainers = List.of(
+                    buildTrainer("bob.builder"),
+                    buildTrainer("alice.coach")
+            );
+            when(gymFacade.getUnassignedTrainers(AUTH_USER, AUTH_PASS, TARGET_USERNAME))
+                    .thenReturn(trainers);
+
+            mockMvc.perform(get(BASE_URL + "/{username}/trainers/not-assigned", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(2)))
+                    .andExpect(jsonPath("$[0].username").value("bob.builder"))
+                    .andExpect(jsonPath("$[0].firstName").value("Bob"))
+                    .andExpect(jsonPath("$[0].specialization").value("CARDIO"));
+
+            verify(gymFacade).getUnassignedTrainers(AUTH_USER, AUTH_PASS, TARGET_USERNAME);
+        }
+
+        @Test
+        @DisplayName("No unassigned trainers → 200 OK with empty list")
+        void noUnassignedTrainers_returns200WithEmptyList() throws Exception {
+            when(gymFacade.getUnassignedTrainers(AUTH_USER, AUTH_PASS, TARGET_USERNAME))
+                    .thenReturn(List.of());
+
+            mockMvc.perform(get(BASE_URL + "/{username}/trainers/not-assigned", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(0)));
+        }
+
+        @Test
+        @DisplayName("Missing auth headers → 400")
+        void missingHeaders_returns400() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/{username}/trainers/not-assigned", TARGET_USERNAME))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Facade throws AuthenticationException → 401")
+        void facadeThrowsAuthException_returns401() throws Exception {
+            when(gymFacade.getUnassignedTrainers(anyString(), anyString(), anyString()))
+                    .thenThrow(new AuthenticationException("Bad credentials"));
+
+            mockMvc.perform(get(BASE_URL + "/{username}/trainers/not-assigned", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", "wrong"))
+                    .andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Nested
+    @DisplayName("PUT /trainees/{username}/trainers — Update Trainer List")
+    class UpdateTraineeTrainers {
+
+        @Test
+        @DisplayName("Valid trainer list → 200 OK with (empty) trainer dtos")
+        void validRequest_returns200() throws Exception {
+            Trainee trainee = buildTrainee(TARGET_USERNAME);
+            when(gymFacade.updateTraineeTrainersList(
+                    eq(AUTH_USER), eq(AUTH_PASS), eq(TARGET_USERNAME), anyList()))
+                    .thenReturn(trainee);
+
+            List<String> trainerUsernames = List.of("bob.builder", "alice.coach");
+
+            mockMvc.perform(put(BASE_URL + "/{username}/trainers", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(trainerUsernames)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$").isArray());
+
+            verify(gymFacade).updateTraineeTrainersList(
+                    eq(AUTH_USER), eq(AUTH_PASS), eq(TARGET_USERNAME), anyList());
+        }
+
+        @Test
+        @DisplayName("Empty trainer list is accepted → 200 OK")
+        void emptyTrainerList_returns200() throws Exception {
+            Trainee trainee = buildTrainee(TARGET_USERNAME);
+            when(gymFacade.updateTraineeTrainersList(anyString(), anyString(), anyString(), anyList()))
+                    .thenReturn(trainee);
+
+            mockMvc.perform(put(BASE_URL + "/{username}/trainers", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("[]"))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("Missing auth headers → 400")
+        void missingHeaders_returns400() throws Exception {
+            mockMvc.perform(put(BASE_URL + "/{username}/trainers", TARGET_USERNAME)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(List.of("bob.builder"))))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Facade throws AuthenticationException → 401")
+        void facadeThrowsAuthException_returns401() throws Exception {
+            when(gymFacade.updateTraineeTrainersList(anyString(), anyString(), anyString(), anyList()))
+                    .thenThrow(new AuthenticationException("Unauthorized"));
+
+            mockMvc.perform(put(BASE_URL + "/{username}/trainers", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", "wrong")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(List.of("bob"))))
+                    .andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /trainees/{username}/trainings — Get Trainings")
+    class GetTraineeTrainings {
+
+        private Training buildTraining() {
+            Trainer trainer = new Trainer();
+            trainer.setUsername("bob.builder");
+
+            Training t = new Training();
+            t.setTrainingName("Morning Run");
+            t.setTrainingDate(LocalDate.of(2024, 3, 15));
+            t.setTrainingType(TrainingType.CARDIO);
+            t.setTrainingDuration(60);
+            t.setTrainer(trainer);
+            return t;
+        }
+
+        @Test
+        @DisplayName("No filters → 200 OK with all trainings")
+        void noFilters_returns200WithAllTrainings() throws Exception {
+            when(gymFacade.getTraineeTrainings(
+                    eq(AUTH_USER), eq(AUTH_PASS), eq(TARGET_USERNAME),
+                    isNull(), isNull(), isNull(), isNull()))
+                    .thenReturn(List.of(buildTraining()));
+
+            mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].trainingName").value("Morning Run"))
+                    .andExpect(jsonPath("$[0].trainingType").value("CARDIO"))
+                    .andExpect(jsonPath("$[0].trainingDuration").value(60))
+                    .andExpect(jsonPath("$[0].trainerName").value("bob.builder"));
+        }
+
+        @Test
+        @DisplayName("Date range filters passed to facade")
+        void dateRangeFilters_passedToFacade() throws Exception {
+            when(gymFacade.getTraineeTrainings(anyString(), anyString(), anyString(),
+                    any(), any(), isNull(), isNull()))
+                    .thenReturn(List.of());
+
+            mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS)
+                            .param("periodFrom", "2024-01-01")
+                            .param("periodTo", "2024-12-31"))
+                    .andExpect(status().isOk());
+
+            verify(gymFacade).getTraineeTrainings(
+                    eq(AUTH_USER), eq(AUTH_PASS), eq(TARGET_USERNAME),
+                    eq(LocalDate.of(2024, 1, 1)),
+                    eq(LocalDate.of(2024, 12, 31)),
+                    isNull(), isNull());
+        }
+
+        @Test
+        @DisplayName("TrainerName filter passed to facade")
+        void trainerNameFilter_passedToFacade() throws Exception {
+            when(gymFacade.getTraineeTrainings(anyString(), anyString(), anyString(),
+                    isNull(), isNull(), eq("bob.builder"), isNull()))
+                    .thenReturn(List.of());
+
+            mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS)
+                            .param("trainerName", "bob.builder"))
+                    .andExpect(status().isOk());
+
+            verify(gymFacade).getTraineeTrainings(
+                    eq(AUTH_USER), eq(AUTH_PASS), eq(TARGET_USERNAME),
+                    isNull(), isNull(), eq("bob.builder"), isNull());
+        }
+
+        @Test
+        @DisplayName("TrainingType filter passed to facade")
+        void trainingTypeFilter_passedToFacade() throws Exception {
+            when(gymFacade.getTraineeTrainings(anyString(), anyString(), anyString(),
+                    isNull(), isNull(), isNull(), eq(TrainingType.CARDIO)))
+                    .thenReturn(List.of());
+
+            mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS)
+                            .param("trainingType", "CARDIO"))
+                    .andExpect(status().isOk());
+
+            verify(gymFacade).getTraineeTrainings(
+                    eq(AUTH_USER), eq(AUTH_PASS), eq(TARGET_USERNAME),
+                    isNull(), isNull(), isNull(), eq(TrainingType.CARDIO));
+        }
+
+        @Test
+        @DisplayName("No trainings found → 200 OK with empty list")
+        void noTrainings_returns200WithEmptyList() throws Exception {
+            when(gymFacade.getTraineeTrainings(anyString(), anyString(), anyString(),
+                    any(), any(), any(), any()))
+                    .thenReturn(List.of());
+
+            mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(0)));
+        }
+
+        @Test
+        @DisplayName("Missing auth headers → 400")
+        void missingHeaders_returns400() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("Facade throws AuthenticationException → 401")
+        void facadeThrowsAuthException_returns401() throws Exception {
+            when(gymFacade.getTraineeTrainings(anyString(), anyString(), anyString(),
+                    any(), any(), any(), any()))
+                    .thenThrow(new AuthenticationException("Bad credentials"));
+
+            mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", "wrong"))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("Invalid date format for periodFrom → 400")
+        void invalidDateFormat_returns400() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME)
+                            .header("X-Auth-Username", AUTH_USER)
+                            .header("X-Auth-Password", AUTH_PASS)
+                            .param("periodFrom", "not-a-date"))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    @DisplayName("Routing — Wrong HTTP Methods")
+    class RoutingTests {
+
+        @Test
+        @DisplayName("GET /trainees → 405 Method Not Allowed")
+        void getOnRegisterEndpoint_returns405() throws Exception {
+            mockMvc.perform(get(BASE_URL))
+                    .andExpect(status().isMethodNotAllowed());
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("POST /trainees/{username} → 405 Method Not Allowed")
+        void postOnProfileEndpoint_returns405() throws Exception {
+            mockMvc.perform(post(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(status().isMethodNotAllowed());
+
+            verifyNoInteractions(gymFacade);
+        }
+
+        @Test
+        @DisplayName("DELETE /trainees → 405 Method Not Allowed")
+        void deleteOnCollectionEndpoint_returns405() throws Exception {
+            mockMvc.perform(delete(BASE_URL))
+                    .andExpect(status().isMethodNotAllowed());
+
+            verifyNoInteractions(gymFacade);
+        }
+    }
+}

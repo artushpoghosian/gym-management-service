@@ -27,6 +27,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -56,7 +57,6 @@ class TraineeDaoImplTest {
         trainee.setDateOfBirth(LocalDate.of(1995, 4, 12));
         trainee.setAddress("123 Main St");
         trainee.setActive(true);
-        trainee.setTrainers(new ArrayList<>());
     }
 
     @Test
@@ -463,8 +463,9 @@ class TraineeDaoImplTest {
         List<Trainer> expected = List.of(new Trainer());
 
         when(entityManager.createQuery(
-                "SELECT tr FROM Trainer tr WHERE tr NOT IN " +
-                        "(SELECT t FROM Trainee tn JOIN tn.trainers t WHERE tn.username = :username)",
+                "SELECT tr FROM Trainer tr " +
+                        "LEFT JOIN Training tg ON tg.trainer = tr AND tg.trainee.username = :username " +
+                        "WHERE tg.id IS NULL",
                 Trainer.class))
                 .thenReturn(query);
         when(query.setParameter("username", "alice.brown")).thenReturn(query);
@@ -480,8 +481,9 @@ class TraineeDaoImplTest {
         TypedQuery<Trainer> query = mock(TypedQuery.class);
 
         when(entityManager.createQuery(
-                "SELECT tr FROM Trainer tr WHERE tr NOT IN " +
-                        "(SELECT t FROM Trainee tn JOIN tn.trainers t WHERE tn.username = :username)",
+                "SELECT tr FROM Trainer tr " +
+                        "LEFT JOIN Training tg ON tg.trainer = tr AND tg.trainee.username = :username " +
+                        "WHERE tg.id IS NULL",
                 Trainer.class))
                 .thenReturn(query);
         when(query.setParameter("username", "alice.brown")).thenReturn(query);
@@ -493,17 +495,22 @@ class TraineeDaoImplTest {
     }
 
     @Test
-    void updateTraineeTrainers_ShouldMergeUpdatedTrainee() {
+    void updateTraineeTrainers_ShouldPersistNewTrainingRecords() {
         Trainer trainer = new Trainer();
         trainer.setId(5L);
+        trainer.setUsername("trainer.jack");
         List<Trainer> trainers = List.of(trainer);
+
         mockFindByUsernameQuery(List.of(trainee));
-        when(entityManager.merge(trainee)).thenReturn(trainee);
+
+        TypedQuery<Long> countQuery = mock(TypedQuery.class);
+        when(entityManager.createQuery(anyString(), eq(Long.class))).thenReturn(countQuery);
+        when(countQuery.setParameter(anyString(), any())).thenReturn(countQuery);
+        when(countQuery.getSingleResult()).thenReturn(0L);
 
         traineeDao.updateTraineeTrainers("alice.brown", trainers);
 
-        assertThat(trainee.getTrainers()).isEqualTo(trainers);
-        verify(entityManager).merge(trainee);
+        verify(entityManager).persist(any(Training.class));
     }
 
     @Test

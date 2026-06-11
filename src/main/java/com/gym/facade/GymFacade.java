@@ -99,6 +99,11 @@ public class GymFacade {
                 targetUsername, fromDate, toDate, traineeName);
     }
 
+    public Optional<Trainer> selectTrainer(String authUsername, String authPassword, String targetUsername) {
+        log.info("Facade: selecting trainer: {}", targetUsername);
+        return trainerService.selectTrainer(authUsername, authPassword, targetUsername);
+    }
+
     public void changeTrainerPassword(String username, String oldPassword, String newPassword) {
         log.info("Facade: changing password for trainer: {}", username);
         trainerService.changePassword(username, oldPassword, newPassword);
