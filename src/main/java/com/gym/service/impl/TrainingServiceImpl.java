@@ -7,9 +7,9 @@ import com.gym.exception.AuthenticationException;
 import com.gym.exception.ValidationException;
 import com.gym.model.Training;
 import com.gym.service.TrainingService;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,24 +21,10 @@ import java.util.Optional;
 @Slf4j
 public class TrainingServiceImpl implements TrainingService {
 
-    private TrainingDao trainingDao;
-    private TraineeDao traineeDao;
-    private TrainerDao trainerDao;
-
-    @Autowired
-    public void setTrainingDao(TrainingDao trainingDao) {
-        this.trainingDao = trainingDao;
-    }
-
-    @Autowired
-    public void setTraineeDao(TraineeDao traineeDao) {
-        this.traineeDao = traineeDao;
-    }
-
-    @Autowired
-    public void setTrainerDao(TrainerDao trainerDao) {
-        this.trainerDao = trainerDao;
-    }
+    private final TrainingDao trainingDao;
+    private final TraineeDao traineeDao;
+    private final TrainerDao trainerDao;
+    private final MeterRegistry meterRegistry;
 
     @Override
     @Transactional
@@ -46,7 +32,15 @@ public class TrainingServiceImpl implements TrainingService {
         log.info("Creating Training: {}", training.getTrainingName());
         authenticate(authUsername, authPassword);
         validateRequiredFields(training);
-        return trainingDao.save(training);
+        Training saved = trainingDao.save(training);
+
+        meterRegistry.counter("gym.trainings.created").increment();
+        meterRegistry.counter("gym.trainings.created.by.type",
+                "trainingType", saved.getTrainingType().name()
+        ).increment();
+        log.debug("Incremented training-created metrics for type: {}", saved.getTrainingType());
+
+        return saved;
     }
 
     @Override

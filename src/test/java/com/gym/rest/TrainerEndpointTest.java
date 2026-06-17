@@ -1,6 +1,8 @@
 package com.gym.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gym.dao.TraineeDao;
+import com.gym.dao.TrainerDao;
 import com.gym.exception.AuthenticationException;
 import com.gym.exception.GlobalExceptionHandler;
 import com.gym.exception.ValidationException;
@@ -20,10 +22,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,6 +52,12 @@ class TrainerEndpointTest {
     @MockBean
     private GymFacade gymFacade;
 
+    @MockBean
+    private TraineeDao traineeDao;
+
+    @MockBean
+    private TrainerDao trainerDao;
+
     private static final String AUTH_USER = "trainer.john";
     private static final String AUTH_PASS = "secret123";
     private static final String TARGET_USER = "trainer.jane";
@@ -63,6 +74,16 @@ class TrainerEndpointTest {
         sampleTrainer.setLastName("Doe");
         sampleTrainer.setSpecialization(TrainingType.CARDIO);
         sampleTrainer.setActive(true);
+
+        Trainer filterAuthTrainer = new Trainer();
+        filterAuthTrainer.setUsername(AUTH_USER);
+        filterAuthTrainer.setPassword(AUTH_PASS);
+        lenient().when(trainerDao.findById(AUTH_USER)).thenReturn(Optional.of(filterAuthTrainer));
+    }
+
+    private String basicAuthHeader() {
+        String credentials = AUTH_USER + ":" + AUTH_PASS;
+        return "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
     }
 
     @Nested
@@ -164,6 +185,7 @@ class TrainerEndpointTest {
                     .thenReturn(Optional.of(sampleTrainer));
 
             mockMvc.perform(get("/trainers/{username}", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS))
                     .andExpect(status().isOk())
@@ -183,6 +205,7 @@ class TrainerEndpointTest {
                     .thenThrow(new AuthenticationException("Invalid credentials"));
 
             mockMvc.perform(get("/trainers/{username}", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, "wrong")
                             .header(HEADER_PASS, "wrong"))
                     .andExpect(status().isUnauthorized());
@@ -195,19 +218,19 @@ class TrainerEndpointTest {
                     .thenReturn(Optional.empty());
 
             mockMvc.perform(get("/trainers/{username}", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS))
                     .andExpect(status().isInternalServerError());
         }
 
         @Test
-        @DisplayName("400 Bad Request – missing auth header")
-        void missingAuthHeader_returns400() throws Exception {
+        @DisplayName("401 Unauthorized – no Authorization header (AuthenticationFilter rejects first)")
+        void missingAuthHeader_returns401FromFilter() throws Exception {
             mockMvc.perform(get("/trainers/{username}", TARGET_USER)
                             .header(HEADER_USER, AUTH_USER))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value("Missing header"))
-                    .andExpect(jsonPath("$.details").value("Required header: X-Auth-Password"));
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.error").value("Unauthorized"));
         }
     }
 
@@ -237,6 +260,7 @@ class TrainerEndpointTest {
                     .thenReturn(updated);
 
             mockMvc.perform(put("/trainers/{username}", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -257,6 +281,7 @@ class TrainerEndpointTest {
             dto.setFirstName("   ");
 
             mockMvc.perform(put("/trainers/{username}", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -274,6 +299,7 @@ class TrainerEndpointTest {
             dto.setIsActive(null);
 
             mockMvc.perform(put("/trainers/{username}", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -289,6 +315,7 @@ class TrainerEndpointTest {
                     .thenThrow(new AuthenticationException("Unauthorized"));
 
             mockMvc.perform(put("/trainers/{username}", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, "bad")
                             .header(HEADER_PASS, "creds")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -303,6 +330,7 @@ class TrainerEndpointTest {
                     .thenThrow(new ValidationException("Username does not match"));
 
             mockMvc.perform(put("/trainers/{username}", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -329,6 +357,7 @@ class TrainerEndpointTest {
                     .setTrainerActive(AUTH_USER, AUTH_PASS, TARGET_USER, true);
 
             mockMvc.perform(patch("/trainers/{username}/status", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -345,6 +374,7 @@ class TrainerEndpointTest {
                     .setTrainerActive(AUTH_USER, AUTH_PASS, TARGET_USER, false);
 
             mockMvc.perform(patch("/trainers/{username}/status", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -358,6 +388,7 @@ class TrainerEndpointTest {
             TrainerStatusPatchDto dto = new TrainerStatusPatchDto();
 
             mockMvc.perform(patch("/trainers/{username}/status", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -375,6 +406,7 @@ class TrainerEndpointTest {
                     .when(gymFacade).setTrainerActive(anyString(), anyString(), anyString(), anyBoolean());
 
             mockMvc.perform(patch("/trainers/{username}/status", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, "bad")
                             .header(HEADER_PASS, "creds")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -383,15 +415,14 @@ class TrainerEndpointTest {
         }
 
         @Test
-        @DisplayName("400 Bad Request – missing X-Auth-Password header")
-        void missingPasswordHeader_returns400() throws Exception {
+        @DisplayName("401 Unauthorized – no Authorization header (AuthenticationFilter rejects first)")
+        void missingPasswordHeader_returns401FromFilter() throws Exception {
             mockMvc.perform(patch("/trainers/{username}/status", TARGET_USER)
                             .header(HEADER_USER, AUTH_USER)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(statusDto(true))))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value("Missing header"))
-                    .andExpect(jsonPath("$.details").value("Required header: X-Auth-Password"));
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.error").value("Unauthorized"));
         }
     }
 
@@ -423,6 +454,7 @@ class TrainerEndpointTest {
                     .thenReturn(trainings);
 
             mockMvc.perform(get("/trainers/{username}/trainings", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS))
                     .andExpect(status().isOk())
@@ -444,6 +476,7 @@ class TrainerEndpointTest {
                     .thenReturn(trainings);
 
             mockMvc.perform(get("/trainers/{username}/trainings", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS)
                             .param("periodFrom", "2024-01-01")
@@ -463,6 +496,7 @@ class TrainerEndpointTest {
                     .thenReturn(List.of());
 
             mockMvc.perform(get("/trainers/{username}/trainings", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS))
                     .andExpect(status().isOk())
@@ -483,6 +517,7 @@ class TrainerEndpointTest {
                     .thenReturn(List.of(t));
 
             mockMvc.perform(get("/trainers/{username}/trainings", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS))
                     .andExpect(status().isOk())
@@ -493,6 +528,7 @@ class TrainerEndpointTest {
         @DisplayName("400 Bad Request – invalid date format")
         void invalidDateFormat_returns400() throws Exception {
             mockMvc.perform(get("/trainers/{username}/trainings", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS)
                             .param("periodFrom", "not-a-date"))
@@ -506,6 +542,7 @@ class TrainerEndpointTest {
                     .thenThrow(new AuthenticationException("Unauthorized"));
 
             mockMvc.perform(get("/trainers/{username}/trainings", TARGET_USER)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, "bad")
                             .header(HEADER_PASS, "creds"))
                     .andExpect(status().isUnauthorized());
@@ -538,6 +575,7 @@ class TrainerEndpointTest {
                     .thenReturn(unassigned);
 
             mockMvc.perform(get("/trainers/not-assigned")
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS)
                             .param("traineeUsername", traineeUsername))
@@ -558,6 +596,7 @@ class TrainerEndpointTest {
                     .thenReturn(List.of());
 
             mockMvc.perform(get("/trainers/not-assigned")
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS)
                             .param("traineeUsername", "trainee.alice"))
@@ -572,6 +611,7 @@ class TrainerEndpointTest {
                     .thenThrow(new AuthenticationException("Unauthorized"));
 
             mockMvc.perform(get("/trainers/not-assigned")
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, "bad")
                             .header(HEADER_PASS, "creds")
                             .param("traineeUsername", "trainee.alice"))
@@ -585,6 +625,7 @@ class TrainerEndpointTest {
                     .thenThrow(new ValidationException("Trainee not found"));
 
             mockMvc.perform(get("/trainers/not-assigned")
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS)
                             .param("traineeUsername", "ghost.user"))
@@ -596,20 +637,20 @@ class TrainerEndpointTest {
         @DisplayName("400 Bad Request – missing traineeUsername query param")
         void missingTraineeUsername_returns400() throws Exception {
             mockMvc.perform(get("/trainers/not-assigned")
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USER, AUTH_USER)
                             .header(HEADER_PASS, AUTH_PASS))
                     .andExpect(status().isBadRequest());
         }
 
         @Test
-        @DisplayName("400 Bad Request – missing X-Auth-Username header")
-        void missingAuthUsernameHeader_returns400() throws Exception {
+        @DisplayName("401 Unauthorized – no Authorization header (AuthenticationFilter rejects first)")
+        void missingAuthUsernameHeader_returns401FromFilter() throws Exception {
             mockMvc.perform(get("/trainers/not-assigned")
                             .header(HEADER_PASS, AUTH_PASS)
                             .param("traineeUsername", "trainee.alice"))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value("Missing header"))
-                    .andExpect(jsonPath("$.details").value(containsString("X-Auth-Username")));
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.error").value("Unauthorized"));
         }
     }
 }

@@ -2,6 +2,8 @@ package com.gym.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.gym.dao.TraineeDao;
+import com.gym.dao.TrainerDao;
 import com.gym.exception.AuthenticationException;
 import com.gym.exception.GlobalExceptionHandler;
 import com.gym.facade.GymFacade;
@@ -20,10 +22,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,6 +53,12 @@ class TraineeEndpointTest {
     @MockBean
     private GymFacade gymFacade;
 
+    @MockBean
+    private TraineeDao traineeDao;
+
+    @MockBean
+    private TrainerDao trainerDao;
+
     private ObjectMapper objectMapper;
 
     private static final String BASE_URL = "/trainees";
@@ -59,6 +70,16 @@ class TraineeEndpointTest {
     void setUp() {
         objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
+
+        Trainee filterAuthTrainee = new Trainee();
+        filterAuthTrainee.setUsername(AUTH_USER);
+        filterAuthTrainee.setPassword(AUTH_PASS);
+        lenient().when(traineeDao.findById(AUTH_USER)).thenReturn(Optional.of(filterAuthTrainee));
+    }
+
+    private String basicAuthHeader() {
+        String credentials = AUTH_USER + ":" + AUTH_PASS;
+        return "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
     }
 
     private Trainee buildTrainee(String username) {
@@ -225,6 +246,7 @@ class TraineeEndpointTest {
                     .thenReturn(Optional.of(trainee));
 
             mockMvc.perform(get(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS))
                     .andExpect(status().isOk())
@@ -244,36 +266,37 @@ class TraineeEndpointTest {
                     .thenReturn(Optional.empty());
 
             mockMvc.perform(get(BASE_URL + "/{username}", "ghost")
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS))
                     .andExpect(status().isInternalServerError());
         }
 
         @Test
-        @DisplayName("Missing X-Auth-Username header → 400")
-        void missingAuthUsernameHeader_returns400() throws Exception {
+        @DisplayName("Missing X-Auth-Username header, no Authorization header → 401 from filter")
+        void missingAuthUsernameHeader_returns401FromFilter() throws Exception {
             mockMvc.perform(get(BASE_URL + "/{username}", TARGET_USERNAME)
                             .header("X-Auth-Password", AUTH_PASS))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
 
         @Test
-        @DisplayName("Missing X-Auth-Password header → 400")
-        void missingAuthPasswordHeader_returns400() throws Exception {
+        @DisplayName("Missing X-Auth-Password header, no Authorization header → 401 from filter")
+        void missingAuthPasswordHeader_returns401FromFilter() throws Exception {
             mockMvc.perform(get(BASE_URL + "/{username}", TARGET_USERNAME)
                             .header("X-Auth-Username", AUTH_USER))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
 
         @Test
-        @DisplayName("Both auth headers missing → 400")
-        void bothHeadersMissing_returns400() throws Exception {
+        @DisplayName("Both auth headers missing → 401 from filter")
+        void bothHeadersMissing_returns401FromFilter() throws Exception {
             mockMvc.perform(get(BASE_URL + "/{username}", TARGET_USERNAME))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
@@ -285,6 +308,7 @@ class TraineeEndpointTest {
                     .thenThrow(new AuthenticationException("Invalid credentials"));
 
             mockMvc.perform(get(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", "wrongPass"))
                     .andExpect(status().isUnauthorized())
@@ -299,6 +323,7 @@ class TraineeEndpointTest {
                     .thenReturn(Optional.of(trainee));
 
             mockMvc.perform(get(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS))
                     .andExpect(status().isOk())
@@ -319,6 +344,7 @@ class TraineeEndpointTest {
                     .thenReturn(updated);
 
             mockMvc.perform(put(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -339,6 +365,7 @@ class TraineeEndpointTest {
             dto.setFirstName(null);
 
             mockMvc.perform(put(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -356,6 +383,7 @@ class TraineeEndpointTest {
             dto.setLastName(null);
 
             mockMvc.perform(put(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -373,6 +401,7 @@ class TraineeEndpointTest {
             dto.setIsActive(null);
 
             mockMvc.perform(put(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -384,12 +413,12 @@ class TraineeEndpointTest {
         }
 
         @Test
-        @DisplayName("Missing auth headers → 400")
-        void missingHeaders_returns400() throws Exception {
+        @DisplayName("Missing auth headers, no Authorization header → 401 from filter")
+        void missingHeaders_returns401FromFilter() throws Exception {
             mockMvc.perform(put(BASE_URL + "/{username}", TARGET_USERNAME)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(buildUpdateRequest())))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
@@ -401,6 +430,7 @@ class TraineeEndpointTest {
                     .thenThrow(new AuthenticationException("Unauthorized"));
 
             mockMvc.perform(put(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", "wrongPass")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -416,6 +446,7 @@ class TraineeEndpointTest {
                     .thenReturn(updated);
 
             mockMvc.perform(put(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -437,6 +468,7 @@ class TraineeEndpointTest {
             doNothing().when(gymFacade).deleteTrainee(AUTH_USER, AUTH_PASS, TARGET_USERNAME);
 
             mockMvc.perform(delete(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS))
                     .andExpect(status().isOk())
@@ -446,21 +478,21 @@ class TraineeEndpointTest {
         }
 
         @Test
-        @DisplayName("Missing X-Auth-Username header → 400")
-        void missingUsernameHeader_returns400() throws Exception {
+        @DisplayName("Missing X-Auth-Username header, no Authorization header → 401 from filter")
+        void missingUsernameHeader_returns401FromFilter() throws Exception {
             mockMvc.perform(delete(BASE_URL + "/{username}", TARGET_USERNAME)
                             .header("X-Auth-Password", AUTH_PASS))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
 
         @Test
-        @DisplayName("Missing X-Auth-Password header → 400")
-        void missingPasswordHeader_returns400() throws Exception {
+        @DisplayName("Missing X-Auth-Password header, no Authorization header → 401 from filter")
+        void missingPasswordHeader_returns401FromFilter() throws Exception {
             mockMvc.perform(delete(BASE_URL + "/{username}", TARGET_USERNAME)
                             .header("X-Auth-Username", AUTH_USER))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
@@ -472,6 +504,7 @@ class TraineeEndpointTest {
                     .when(gymFacade).deleteTrainee(anyString(), anyString(), anyString());
 
             mockMvc.perform(delete(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", "badPass"))
                     .andExpect(status().isUnauthorized())
@@ -485,6 +518,7 @@ class TraineeEndpointTest {
                     .when(gymFacade).deleteTrainee(anyString(), anyString(), anyString());
 
             mockMvc.perform(delete(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS))
                     .andExpect(status().isInternalServerError());
@@ -496,6 +530,7 @@ class TraineeEndpointTest {
             doNothing().when(gymFacade).deleteTrainee(anyString(), anyString(), anyString());
 
             mockMvc.perform(delete(BASE_URL + "/{username}", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS))
                     .andExpect(status().isOk());
@@ -520,6 +555,7 @@ class TraineeEndpointTest {
             doNothing().when(gymFacade).setTraineeActive(AUTH_USER, AUTH_PASS, TARGET_USERNAME, true);
 
             mockMvc.perform(patch(BASE_URL + "/{username}/status", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -536,6 +572,7 @@ class TraineeEndpointTest {
             doNothing().when(gymFacade).setTraineeActive(AUTH_USER, AUTH_PASS, TARGET_USERNAME, false);
 
             mockMvc.perform(patch(BASE_URL + "/{username}/status", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -549,6 +586,7 @@ class TraineeEndpointTest {
         @DisplayName("Null isActive in body → 400")
         void nullIsActive_returns400() throws Exception {
             mockMvc.perform(patch(BASE_URL + "/{username}/status", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -563,6 +601,7 @@ class TraineeEndpointTest {
         @DisplayName("Missing isActive field → 400")
         void missingIsActive_returns400() throws Exception {
             mockMvc.perform(patch(BASE_URL + "/{username}/status", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -573,12 +612,12 @@ class TraineeEndpointTest {
         }
 
         @Test
-        @DisplayName("Missing auth headers → 400")
-        void missingHeaders_returns400() throws Exception {
+        @DisplayName("Missing auth headers, no Authorization header → 401 from filter")
+        void missingHeaders_returns401FromFilter() throws Exception {
             mockMvc.perform(patch(BASE_URL + "/{username}/status", TARGET_USERNAME)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(buildStatusDto(true))))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
@@ -590,6 +629,7 @@ class TraineeEndpointTest {
                     .when(gymFacade).setTraineeActive(anyString(), anyString(), anyString(), anyBoolean());
 
             mockMvc.perform(patch(BASE_URL + "/{username}/status", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", "wrong")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -622,6 +662,7 @@ class TraineeEndpointTest {
                     .thenReturn(trainers);
 
             mockMvc.perform(get(BASE_URL + "/{username}/trainers/not-assigned", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS))
                     .andExpect(status().isOk())
@@ -640,6 +681,7 @@ class TraineeEndpointTest {
                     .thenReturn(List.of());
 
             mockMvc.perform(get(BASE_URL + "/{username}/trainers/not-assigned", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS))
                     .andExpect(status().isOk())
@@ -647,10 +689,10 @@ class TraineeEndpointTest {
         }
 
         @Test
-        @DisplayName("Missing auth headers → 400")
-        void missingHeaders_returns400() throws Exception {
+        @DisplayName("Missing auth headers, no Authorization header → 401 from filter")
+        void missingHeaders_returns401FromFilter() throws Exception {
             mockMvc.perform(get(BASE_URL + "/{username}/trainers/not-assigned", TARGET_USERNAME))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
@@ -662,6 +704,7 @@ class TraineeEndpointTest {
                     .thenThrow(new AuthenticationException("Bad credentials"));
 
             mockMvc.perform(get(BASE_URL + "/{username}/trainers/not-assigned", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", "wrong"))
                     .andExpect(status().isUnauthorized());
@@ -683,6 +726,7 @@ class TraineeEndpointTest {
             List<String> trainerUsernames = List.of("bob.builder", "alice.coach");
 
             mockMvc.perform(put(BASE_URL + "/{username}/trainers", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -702,6 +746,7 @@ class TraineeEndpointTest {
                     .thenReturn(trainee);
 
             mockMvc.perform(put(BASE_URL + "/{username}/trainers", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -710,12 +755,12 @@ class TraineeEndpointTest {
         }
 
         @Test
-        @DisplayName("Missing auth headers → 400")
-        void missingHeaders_returns400() throws Exception {
+        @DisplayName("Missing auth headers, no Authorization header → 401 from filter")
+        void missingHeaders_returns401FromFilter() throws Exception {
             mockMvc.perform(put(BASE_URL + "/{username}/trainers", TARGET_USERNAME)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(List.of("bob.builder"))))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
@@ -727,6 +772,7 @@ class TraineeEndpointTest {
                     .thenThrow(new AuthenticationException("Unauthorized"));
 
             mockMvc.perform(put(BASE_URL + "/{username}/trainers", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", "wrong")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -761,6 +807,7 @@ class TraineeEndpointTest {
                     .thenReturn(List.of(buildTraining()));
 
             mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS))
                     .andExpect(status().isOk())
@@ -779,6 +826,7 @@ class TraineeEndpointTest {
                     .thenReturn(List.of());
 
             mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS)
                             .param("periodFrom", "2024-01-01")
@@ -800,6 +848,7 @@ class TraineeEndpointTest {
                     .thenReturn(List.of());
 
             mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS)
                             .param("trainerName", "bob.builder"))
@@ -818,6 +867,7 @@ class TraineeEndpointTest {
                     .thenReturn(List.of());
 
             mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS)
                             .param("trainingType", "CARDIO"))
@@ -836,6 +886,7 @@ class TraineeEndpointTest {
                     .thenReturn(List.of());
 
             mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS))
                     .andExpect(status().isOk())
@@ -843,10 +894,10 @@ class TraineeEndpointTest {
         }
 
         @Test
-        @DisplayName("Missing auth headers → 400")
-        void missingHeaders_returns400() throws Exception {
+        @DisplayName("Missing auth headers, no Authorization header → 401 from filter")
+        void missingHeaders_returns401FromFilter() throws Exception {
             mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
@@ -859,6 +910,7 @@ class TraineeEndpointTest {
                     .thenThrow(new AuthenticationException("Bad credentials"));
 
             mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", "wrong"))
                     .andExpect(status().isUnauthorized());
@@ -868,6 +920,7 @@ class TraineeEndpointTest {
         @DisplayName("Invalid date format for periodFrom → 400")
         void invalidDateFormat_returns400() throws Exception {
             mockMvc.perform(get(BASE_URL + "/{username}/trainings", TARGET_USERNAME)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header("X-Auth-Username", AUTH_USER)
                             .header("X-Auth-Password", AUTH_PASS)
                             .param("periodFrom", "not-a-date"))
@@ -880,30 +933,30 @@ class TraineeEndpointTest {
     class RoutingTests {
 
         @Test
-        @DisplayName("GET /trainees → 405 Method Not Allowed")
-        void getOnRegisterEndpoint_returns405() throws Exception {
+        @DisplayName("GET /trainees (no auth) → 401 from AuthenticationFilter, not 405")
+        void getOnRegisterEndpoint_returns401FromFilter() throws Exception {
             mockMvc.perform(get(BASE_URL))
-                    .andExpect(status().isMethodNotAllowed());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
 
         @Test
-        @DisplayName("POST /trainees/{username} → 405 Method Not Allowed")
-        void postOnProfileEndpoint_returns405() throws Exception {
+        @DisplayName("POST /trainees/{username} (no auth) → 401 from AuthenticationFilter, not 405")
+        void postOnProfileEndpoint_returns401FromFilter() throws Exception {
             mockMvc.perform(post(BASE_URL + "/{username}", TARGET_USERNAME)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{}"))
-                    .andExpect(status().isMethodNotAllowed());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
 
         @Test
-        @DisplayName("DELETE /trainees → 405 Method Not Allowed")
-        void deleteOnCollectionEndpoint_returns405() throws Exception {
+        @DisplayName("DELETE /trainees (no auth) → 401 from AuthenticationFilter, not 405")
+        void deleteOnCollectionEndpoint_returns401FromFilter() throws Exception {
             mockMvc.perform(delete(BASE_URL))
-                    .andExpect(status().isMethodNotAllowed());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }

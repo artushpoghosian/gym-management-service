@@ -1,6 +1,8 @@
 package com.gym.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gym.dao.TraineeDao;
+import com.gym.dao.TrainerDao;
 import com.gym.exception.AuthenticationException;
 import com.gym.facade.GymFacade;
 import com.gym.rest.dto.auth.LoginRequestDto;
@@ -32,6 +34,12 @@ class AuthEndpointTest {
 
     @MockBean
     private GymFacade gymFacade;
+
+    @MockBean
+    private TraineeDao traineeDao;
+
+    @MockBean
+    private TrainerDao trainerDao;
 
     private static final String LOGIN_URL = "/auth/login";
     private static final String VALID_USERNAME = "john.doe";
@@ -258,59 +266,51 @@ class AuthEndpointTest {
         }
 
         @Nested
-        @DisplayName("Routing — 404 / 405")
+        @DisplayName("Routing — requests intercepted by AuthenticationFilter before reaching routing")
         class RoutingErrors {
 
             @Test
-            @DisplayName("GET /auth/login → 405 Method Not Allowed")
-            void getOnLoginEndpoint_returns405() throws Exception {
+            @DisplayName("GET /auth/login (wrong method, no auth) → 401 from AuthenticationFilter")
+            void getOnLoginEndpoint_returns401FromFilter() throws Exception {
                 mockMvc.perform(get(LOGIN_URL)
                                 .contentType(MediaType.APPLICATION_JSON))
-                        .andExpect(result -> {
-                            assert result.getResolvedException() instanceof org.springframework.web.HttpRequestMethodNotSupportedException;
-                        });
+                        .andExpect(status().isUnauthorized());
 
                 verifyNoInteractions(gymFacade);
             }
 
             @Test
-            @DisplayName("PUT /auth/login → 405 Method Not Allowed")
-            void putOnLoginEndpoint_returns405() throws Exception {
+            @DisplayName("PUT /auth/login (wrong method, no auth) → 401 from AuthenticationFilter")
+            void putOnLoginEndpoint_returns401FromFilter() throws Exception {
                 mockMvc.perform(put(LOGIN_URL)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
                                         buildRequest(VALID_USERNAME, VALID_PASSWORD))))
-                        .andExpect(result -> {
-                            assert result.getResolvedException() instanceof org.springframework.web.HttpRequestMethodNotSupportedException;
-                        });
+                        .andExpect(status().isUnauthorized());
 
                 verifyNoInteractions(gymFacade);
             }
 
             @Test
-            @DisplayName("POST /auth/unknown → 404 Not Found")
-            void postToUnknownPath_returns404() throws Exception {
+            @DisplayName("POST /auth/unknown (wrong path, no auth) → 401 from AuthenticationFilter")
+            void postToUnknownPath_returns401FromFilter() throws Exception {
                 mockMvc.perform(post("/auth/unknown")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
                                         buildRequest(VALID_USERNAME, VALID_PASSWORD))))
-                        .andExpect(result -> {
-                            assert result.getResolvedException() instanceof org.springframework.web.servlet.resource.NoResourceFoundException;
-                        });
+                        .andExpect(status().isUnauthorized());
 
                 verifyNoInteractions(gymFacade);
             }
 
             @Test
-            @DisplayName("POST /login (missing /auth prefix) → 404 Not Found")
-            void postWithoutAuthPrefix_returns404() throws Exception {
+            @DisplayName("POST /login - missing /auth prefix, no auth → 401 from AuthenticationFilter")
+            void postWithoutAuthPrefix_returns401FromFilter() throws Exception {
                 mockMvc.perform(post("/login")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
                                         buildRequest(VALID_USERNAME, VALID_PASSWORD))))
-                        .andExpect(result -> {
-                            assert result.getResolvedException() instanceof org.springframework.web.servlet.resource.NoResourceFoundException;
-                        });
+                        .andExpect(status().isUnauthorized());
 
                 verifyNoInteractions(gymFacade);
             }

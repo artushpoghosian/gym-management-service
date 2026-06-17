@@ -9,6 +9,8 @@ import com.gym.model.Trainee;
 import com.gym.model.Trainer;
 import com.gym.model.Training;
 import com.gym.model.TrainingType;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +25,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,6 +41,12 @@ class TrainingServiceImplTest {
 
     @Mock
     private TrainerDao trainerDao;
+
+    @Mock
+    private Counter counter;
+
+    @Mock
+    private MeterRegistry meterRegistry;
 
     @InjectMocks
     private TrainingServiceImpl trainingService;
@@ -88,6 +97,7 @@ class TrainingServiceImplTest {
     void create_ShouldSaveTraining_WhenAuthenticatedAsTraineeAndFieldsValid() {
         mockTraineeAuthenticationSuccess();
         when(trainingDao.save(training)).thenReturn(training);
+        when(meterRegistry.counter(anyString(), any(String[].class))).thenReturn(counter);
 
         Training result = trainingService.create(authUser, authPass, training);
 
@@ -99,6 +109,7 @@ class TrainingServiceImplTest {
     void create_ShouldSaveTraining_WhenAuthenticatedAsTrainerAndFieldsValid() {
         mockTrainerAuthenticationSuccess();
         when(trainingDao.save(training)).thenReturn(training);
+        when(meterRegistry.counter(anyString(), any(String[].class))).thenReturn(counter);
 
         Training result = trainingService.create(authUser, authPass, training);
 

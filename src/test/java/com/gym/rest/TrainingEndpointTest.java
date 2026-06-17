@@ -2,6 +2,8 @@ package com.gym.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.gym.dao.TraineeDao;
+import com.gym.dao.TrainerDao;
 import com.gym.exception.AuthenticationException;
 import com.gym.exception.GlobalExceptionHandler;
 import com.gym.exception.ValidationException;
@@ -19,10 +21,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.Base64;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.*;
@@ -44,6 +49,19 @@ class TrainingEndpointTest {
     @MockBean
     private GymFacade gymFacade;
 
+    /**
+     * Required so {@code AuthenticationFilter} can be constructed by Spring
+     * inside this slice context - see the class-level Javadoc. Stubbed in
+     * {@link #setUp()} to recognize {@link #AUTH_USER}/{@link #AUTH_PASS} as
+     * a valid trainee, so {@link #basicAuthHeader()} successfully passes the
+     * filter for every test that includes it.
+     */
+    @MockBean
+    private TraineeDao traineeDao;
+
+    @MockBean
+    private TrainerDao trainerDao;
+
     private static final String TRAININGS_URL      = "/api/trainings";
     private static final String TRAINING_TYPES_URL = "/api/training-types";
 
@@ -64,6 +82,16 @@ class TrainingEndpointTest {
     void setUp() {
         objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
+
+        Trainee filterAuthTrainee = new Trainee();
+        filterAuthTrainee.setUsername(AUTH_USER);
+        filterAuthTrainee.setPassword(AUTH_PASS);
+        lenient().when(traineeDao.findById(AUTH_USER)).thenReturn(Optional.of(filterAuthTrainee));
+    }
+
+    private String basicAuthHeader() {
+        String credentials = AUTH_USER + ":" + AUTH_PASS;
+        return "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
     }
 
     private Trainee buildTrainee() {
@@ -113,6 +141,7 @@ class TrainingEndpointTest {
             stubSuccessfulLookups(TrainingType.CARDIO);
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -131,6 +160,7 @@ class TrainingEndpointTest {
             stubSuccessfulLookups(TrainingType.STRENGTH);
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -144,6 +174,7 @@ class TrainingEndpointTest {
             stubSuccessfulLookups(TrainingType.YOGA);
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -160,6 +191,7 @@ class TrainingEndpointTest {
             stubSuccessfulLookups(TrainingType.CARDIO);
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -174,30 +206,12 @@ class TrainingEndpointTest {
         }
 
         @Test
-        @DisplayName("Request without auth headers (null) still processes when facade permits it")
-        void noAuthHeaders_facadePermits_returns200() throws Exception {
-            when(gymFacade.selectTrainee(null, null, TRAINEE_USERNAME))
-                    .thenReturn(Optional.of(buildTrainee()));
-            when(gymFacade.selectTrainer(null, null, TRAINER_USERNAME))
-                    .thenReturn(Optional.of(buildTrainer(TrainingType.CARDIO)));
-            when(gymFacade.createTraining(isNull(), isNull(), any(Training.class)))
-                    .thenReturn(new Training());
-
-            mockMvc.perform(post(TRAININGS_URL)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(buildValidRequest())))
-                    .andExpect(status().isOk());
-
-            verify(gymFacade).selectTrainee(null, null, TRAINEE_USERNAME);
-            verify(gymFacade).selectTrainer(null, null, TRAINER_USERNAME);
-        }
-
-        @Test
         @DisplayName("createTraining is called exactly once on success")
         void createTraining_calledExactlyOnce() throws Exception {
             stubSuccessfulLookups(TrainingType.CARDIO);
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -214,6 +228,7 @@ class TrainingEndpointTest {
             dto.setTraineeUsername(null);
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -232,6 +247,7 @@ class TrainingEndpointTest {
             dto.setTraineeUsername("   ");
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -249,6 +265,7 @@ class TrainingEndpointTest {
             dto.setTrainerUsername(null);
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -267,6 +284,7 @@ class TrainingEndpointTest {
             dto.setTrainingName(null);
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -285,6 +303,7 @@ class TrainingEndpointTest {
             dto.setTrainingDate(null);
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -303,6 +322,7 @@ class TrainingEndpointTest {
             dto.setTrainingDuration(0);
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -321,6 +341,7 @@ class TrainingEndpointTest {
             dto.setTrainingDuration(-30);
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -335,6 +356,7 @@ class TrainingEndpointTest {
         @DisplayName("All fields missing → 400 with errors for each @NotBlank/@NotNull field")
         void allFieldsMissing_returns400WithMultipleErrors() throws Exception {
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -352,6 +374,7 @@ class TrainingEndpointTest {
         @DisplayName("Malformed JSON body → 400 with 'Malformed JSON request' message")
         void malformedJson_returns400() throws Exception {
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -376,6 +399,7 @@ class TrainingEndpointTest {
                     """;
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -392,6 +416,7 @@ class TrainingEndpointTest {
                     .thenReturn(Optional.empty());
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -413,6 +438,7 @@ class TrainingEndpointTest {
                     .thenReturn(Optional.empty());
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -431,6 +457,7 @@ class TrainingEndpointTest {
                     .thenReturn(Optional.empty());
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -449,6 +476,7 @@ class TrainingEndpointTest {
             TrainingRequestDto dto = buildValidRequest();
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, "wrongPass")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -468,6 +496,7 @@ class TrainingEndpointTest {
                     .thenThrow(new AuthenticationException("Unauthorized"));
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -488,6 +517,7 @@ class TrainingEndpointTest {
                     .thenThrow(new AuthenticationException("Forbidden"));
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -503,6 +533,7 @@ class TrainingEndpointTest {
                     .thenThrow(new RuntimeException("Database unavailable"));
 
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -513,21 +544,19 @@ class TrainingEndpointTest {
         }
 
         @Test
-        @DisplayName("GET /api/trainings → 405 Method Not Allowed")
-        void getOnTrainingsEndpoint_returns405() throws Exception {
+        @DisplayName("GET /api/trainings (no auth) → 401 from AuthenticationFilter, not 405")
+        void getOnTrainingsEndpoint_returns401FromFilter() throws Exception {
             mockMvc.perform(get(TRAININGS_URL))
-                    .andExpect(status().isMethodNotAllowed())
-                    .andExpect(jsonPath("$.message").value("Method Not Allowed"))
-                    .andExpect(jsonPath("$.details").value("The requested HTTP method is not supported"));
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
 
         @Test
-        @DisplayName("DELETE /api/trainings → 405 Method Not Allowed")
-        void deleteOnTrainingsEndpoint_returns405() throws Exception {
+        @DisplayName("DELETE /api/trainings (no auth) → 401 from AuthenticationFilter, not 405")
+        void deleteOnTrainingsEndpoint_returns401FromFilter() throws Exception {
             mockMvc.perform(delete(TRAININGS_URL))
-                    .andExpect(status().isMethodNotAllowed());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
@@ -536,6 +565,7 @@ class TrainingEndpointTest {
         @DisplayName("Missing Content-Type header → 415 Unsupported Media Type")
         void missingContentType_returns415() throws Exception {
             mockMvc.perform(post(TRAININGS_URL)
+                            .header(HttpHeaders.AUTHORIZATION, basicAuthHeader())
                             .header(HEADER_USERNAME, AUTH_USER)
                             .header(HEADER_PASSWORD, AUTH_PASS)
                             .content(objectMapper.writeValueAsString(buildValidRequest())))
@@ -632,19 +662,18 @@ class TrainingEndpointTest {
         }
 
         @Test
-        @DisplayName("POST /api/training-types → 405 Method Not Allowed")
-        void postOnTrainingTypes_returns405() throws Exception {
+        @DisplayName("POST /api/training-types (wrong method, no auth) → 401 from AuthenticationFilter")
+        void postOnTrainingTypes_returns401FromFilter() throws Exception {
             mockMvc.perform(post(TRAINING_TYPES_URL)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{}"))
-                    .andExpect(status().isMethodNotAllowed())
-                    .andExpect(jsonPath("$.message").value("Method Not Allowed"));
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
 
         @Test
-        @DisplayName("Auth headers are not required for training-types endpoint")
+        @DisplayName("GET /api/training-types is exempt from AuthenticationFilter - no auth required")
         void noAuthHeaders_trainingTypes_returns200() throws Exception {
             mockMvc.perform(get(TRAINING_TYPES_URL))
                     .andExpect(status().isOk());
@@ -654,34 +683,34 @@ class TrainingEndpointTest {
     }
 
     @Nested
-    @DisplayName("Unknown Routes — 404 Not Found")
+    @DisplayName("Unknown Routes — intercepted by AuthenticationFilter before routing")
     class UnknownRoutes {
 
         @Test
-        @DisplayName("POST /api/training → 404 (typo, missing trailing 's')")
-        void typoInPath_returns404() throws Exception {
+        @DisplayName("POST /api/training (typo, no auth) → 401 from AuthenticationFilter")
+        void typoInPath_returns401FromFilter() throws Exception {
             mockMvc.perform(post("/api/training")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(buildValidRequest())))
-                    .andExpect(status().isNotFound());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
 
         @Test
-        @DisplayName("GET /api/training-type → 404 (typo, missing trailing 's')")
-        void typoInTrainingTypesPath_returns404() throws Exception {
+        @DisplayName("GET /api/training-type (typo, no auth) → 401 from AuthenticationFilter")
+        void typoInTrainingTypesPath_returns401FromFilter() throws Exception {
             mockMvc.perform(get("/api/training-type"))
-                    .andExpect(status().isNotFound());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
 
         @Test
-        @DisplayName("GET /trainings (missing /api prefix) → 404")
-        void missingApiPrefix_returns404() throws Exception {
+        @DisplayName("GET /trainings - missing /api prefix, no auth → 401 from AuthenticationFilter")
+        void missingApiPrefix_returns401FromFilter() throws Exception {
             mockMvc.perform(get("/trainings"))
-                    .andExpect(status().isNotFound());
+                    .andExpect(status().isUnauthorized());
 
             verifyNoInteractions(gymFacade);
         }
