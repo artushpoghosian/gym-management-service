@@ -13,6 +13,7 @@ import com.gym.utilities.UserUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,7 @@ public class TraineeServiceImpl implements TraineeService {
     private TraineeDao traineeDao;
     private TrainerDao trainerDao;
     private UserUtils userUtils;
+    private PasswordEncoder passwordEncoder;
 
     @Autowired
     public void setTraineeDao(TraineeDao traineeDao) {
@@ -45,6 +47,11 @@ public class TraineeServiceImpl implements TraineeService {
         this.trainerDao = trainerDao;
     }
 
+    @Autowired
+    public void setPasswordEncoder(PasswordEncoder passwordEncoder) {
+        this.passwordEncoder = passwordEncoder;
+    }
+
     @Override
     public Trainee create(Trainee trainee) {
         log.info("Creating Trainee: {} {}", trainee.getFirstName(), trainee.getLastName());
@@ -55,12 +62,14 @@ public class TraineeServiceImpl implements TraineeService {
                 traineeDao.existsByUsername(username) || trainerDao.existsByUsername(username);
 
         String username = userUtils.generateUsername(trainee.getFirstName(), trainee.getLastName(), usernameExists);
-        String password = userUtils.generatePassword();
+        String plainPassword = userUtils.generatePassword();
 
         trainee.setUsername(username);
-        trainee.setPassword(password);
+        trainee.setPassword(passwordEncoder.encode(plainPassword));
         trainee.setActive(true);
         traineeDao.save(trainee);
+        // expose plain password in the response; the hashed value is already persisted
+        trainee.setPassword(plainPassword);
         return trainee;
     }
 
@@ -69,7 +78,7 @@ public class TraineeServiceImpl implements TraineeService {
     public boolean matchCredentials(String username, String password) {
         log.info("Checking credentials for trainee: {}", username);
         return traineeDao.findById(username)
-                .map(t -> t.getPassword().equals(password))
+                .map(t -> passwordEncoder.matches(password, t.getPassword()))
                 .orElse(false);
     }
 
@@ -89,7 +98,7 @@ public class TraineeServiceImpl implements TraineeService {
         if (newPassword == null || newPassword.isBlank()) {
             throw new ValidationException("New password must not be blank");
         }
-        traineeDao.updatePassword(username, newPassword);
+        traineeDao.updatePassword(username, passwordEncoder.encode(newPassword));
     }
 
     @Override
@@ -174,7 +183,7 @@ public class TraineeServiceImpl implements TraineeService {
 
     private void authenticate(String username, String password) {
         boolean valid = traineeDao.findById(username)
-                .map(t -> t.getPassword().equals(password))
+                .map(t -> passwordEncoder.matches(password, t.getPassword()))
                 .orElse(false);
         if (!valid) {
             log.warn("Authentication failed for trainee username: {}", username);

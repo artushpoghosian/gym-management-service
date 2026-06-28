@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -23,9 +24,9 @@ import java.util.function.Predicate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.anyBoolean;
-import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,6 +43,9 @@ class TrainerServiceImplTest {
     @Mock
     private UserUtils userUtils;
 
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
     @InjectMocks
     private TrainerServiceImpl trainerService;
 
@@ -56,7 +60,7 @@ class TrainerServiceImplTest {
         trainer.setFirstName("John");
         trainer.setLastName("Smith");
         trainer.setUsername("john.smith");
-        trainer.setPassword("password123");
+        trainer.setPassword("$2a$10$hashedpassword");
         trainer.setSpecialization(TrainingType.YOGA);
         trainer.setActive(true);
     }
@@ -64,8 +68,9 @@ class TrainerServiceImplTest {
     private void mockAuthenticationSuccess() {
         Trainer authTrainer = new Trainer();
         authTrainer.setUsername(authUser);
-        authTrainer.setPassword(authPass);
+        authTrainer.setPassword("$2a$10$hashedauthpass");
         when(trainerDao.findById(authUser)).thenReturn(Optional.of(authTrainer));
+        when(passwordEncoder.matches(authPass, "$2a$10$hashedauthpass")).thenReturn(true);
     }
 
     private void mockAuthenticationFailure() {
@@ -82,12 +87,13 @@ class TrainerServiceImplTest {
         when(userUtils.generateUsername(eq("John"), eq("Smith"), any(Predicate.class)))
                 .thenReturn("john.smith");
         when(userUtils.generatePassword()).thenReturn("password123");
+        when(passwordEncoder.encode("password123")).thenReturn("$2a$10$encoded");
         when(trainerDao.save(newTrainer)).thenReturn(newTrainer);
 
         Trainer result = trainerService.create(newTrainer);
 
         assertThat(result.getUsername()).isEqualTo("john.smith");
-        assertThat(result.getPassword()).isEqualTo("password123");
+        assertThat(result.getPassword()).isEqualTo("password123"); // plain password returned
         assertThat(result.isActive()).isTrue();
         verify(trainerDao).save(newTrainer);
     }
@@ -122,14 +128,20 @@ class TrainerServiceImplTest {
     @Test
     void matchCredentials_ShouldReturnTrue_WhenCredentialsMatch() {
         when(trainerDao.findById("john.smith")).thenReturn(Optional.of(trainer));
+        when(passwordEncoder.matches("password123", trainer.getPassword())).thenReturn(true);
+
         boolean result = trainerService.matchCredentials("john.smith", "password123");
+
         assertThat(result).isTrue();
     }
 
     @Test
     void matchCredentials_ShouldReturnFalse_WhenPasswordIsIncorrect() {
         when(trainerDao.findById("john.smith")).thenReturn(Optional.of(trainer));
+        when(passwordEncoder.matches("wrongPass", trainer.getPassword())).thenReturn(false);
+
         boolean result = trainerService.matchCredentials("john.smith", "wrongPass");
+
         assertThat(result).isFalse();
     }
 
@@ -163,20 +175,23 @@ class TrainerServiceImplTest {
     void changePassword_ShouldUpdatePassword_WhenAuthenticatedAndValid() {
         Trainer authTrainer = new Trainer();
         authTrainer.setUsername("john.smith");
-        authTrainer.setPassword("oldPass");
+        authTrainer.setPassword("$2a$10$hashedold");
         when(trainerDao.findById("john.smith")).thenReturn(Optional.of(authTrainer));
+        when(passwordEncoder.matches("oldPass", "$2a$10$hashedold")).thenReturn(true);
+        when(passwordEncoder.encode("newPass")).thenReturn("$2a$10$hashednew");
 
         trainerService.changePassword("john.smith", "oldPass", "newPass");
 
-        verify(trainerDao).updatePassword("john.smith", "newPass");
+        verify(trainerDao).updatePassword("john.smith", "$2a$10$hashednew");
     }
 
     @Test
     void changePassword_ShouldThrowValidationException_WhenNewPasswordIsBlank() {
         Trainer authTrainer = new Trainer();
         authTrainer.setUsername("john.smith");
-        authTrainer.setPassword("oldPass");
+        authTrainer.setPassword("$2a$10$hashedold");
         when(trainerDao.findById("john.smith")).thenReturn(Optional.of(authTrainer));
+        when(passwordEncoder.matches("oldPass", "$2a$10$hashedold")).thenReturn(true);
 
         assertThatThrownBy(() -> trainerService.changePassword("john.smith", "oldPass", "   "))
                 .isInstanceOf(ValidationException.class)

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -24,6 +25,7 @@ import java.util.function.Predicate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -41,6 +43,9 @@ class TraineeServiceImplTest {
     @Mock
     private UserUtils userUtils;
 
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
     @InjectMocks
     private TraineeServiceImpl traineeService;
 
@@ -55,7 +60,7 @@ class TraineeServiceImplTest {
         trainee.setFirstName("Alice");
         trainee.setLastName("Brown");
         trainee.setUsername("alice.brown");
-        trainee.setPassword("pass123456");
+        trainee.setPassword("$2a$10$hashedpassword");
         trainee.setDateOfBirth(LocalDate.of(1995, 4, 12));
         trainee.setAddress("123 Main St");
         trainee.setActive(true);
@@ -64,8 +69,9 @@ class TraineeServiceImplTest {
     private void mockAuthenticationSuccess() {
         Trainee authTrainee = new Trainee();
         authTrainee.setUsername(authUser);
-        authTrainee.setPassword(authPass);
+        authTrainee.setPassword("$2a$10$hashedauthpass");
         when(traineeDao.findById(authUser)).thenReturn(Optional.of(authTrainee));
+        when(passwordEncoder.matches(authPass, "$2a$10$hashedauthpass")).thenReturn(true);
     }
 
     private void mockAuthenticationFailure() {
@@ -81,12 +87,13 @@ class TraineeServiceImplTest {
         when(userUtils.generateUsername(eq("Alice"), eq("Brown"), any(Predicate.class)))
                 .thenReturn("alice.brown");
         when(userUtils.generatePassword()).thenReturn("pass123456");
+        when(passwordEncoder.encode("pass123456")).thenReturn("$2a$10$encoded");
         when(traineeDao.save(newTrainee)).thenReturn(newTrainee);
 
         Trainee result = traineeService.create(newTrainee);
 
         assertThat(result.getUsername()).isEqualTo("alice.brown");
-        assertThat(result.getPassword()).isEqualTo("pass123456");
+        assertThat(result.getPassword()).isEqualTo("pass123456"); // plain password returned
         assertThat(result.isActive()).isTrue();
         verify(traineeDao).save(newTrainee);
     }
@@ -112,14 +119,20 @@ class TraineeServiceImplTest {
     @Test
     void matchCredentials_ShouldReturnTrue_WhenCredentialsMatch() {
         when(traineeDao.findById("alice.brown")).thenReturn(Optional.of(trainee));
+        when(passwordEncoder.matches("pass123456", trainee.getPassword())).thenReturn(true);
+
         boolean result = traineeService.matchCredentials("alice.brown", "pass123456");
+
         assertThat(result).isTrue();
     }
 
     @Test
     void matchCredentials_ShouldReturnFalse_WhenPasswordIncorrect() {
         when(traineeDao.findById("alice.brown")).thenReturn(Optional.of(trainee));
+        when(passwordEncoder.matches("wrongpass", trainee.getPassword())).thenReturn(false);
+
         boolean result = traineeService.matchCredentials("alice.brown", "wrongpass");
+
         assertThat(result).isFalse();
     }
 
@@ -153,20 +166,23 @@ class TraineeServiceImplTest {
     void changePassword_ShouldUpdatePassword_WhenAuthenticatedAndValid() {
         Trainee authTrainee = new Trainee();
         authTrainee.setUsername("alice.brown");
-        authTrainee.setPassword("oldPass");
+        authTrainee.setPassword("$2a$10$hashedold");
         when(traineeDao.findById("alice.brown")).thenReturn(Optional.of(authTrainee));
+        when(passwordEncoder.matches("oldPass", "$2a$10$hashedold")).thenReturn(true);
+        when(passwordEncoder.encode("newPass")).thenReturn("$2a$10$hashednew");
 
         traineeService.changePassword("alice.brown", "oldPass", "newPass");
 
-        verify(traineeDao).updatePassword("alice.brown", "newPass");
+        verify(traineeDao).updatePassword("alice.brown", "$2a$10$hashednew");
     }
 
     @Test
     void changePassword_ShouldThrowValidationException_WhenNewPasswordIsBlank() {
         Trainee authTrainee = new Trainee();
         authTrainee.setUsername("alice.brown");
-        authTrainee.setPassword("oldPass");
+        authTrainee.setPassword("$2a$10$hashedold");
         when(traineeDao.findById("alice.brown")).thenReturn(Optional.of(authTrainee));
+        when(passwordEncoder.matches("oldPass", "$2a$10$hashedold")).thenReturn(true);
 
         assertThatThrownBy(() -> traineeService.changePassword("alice.brown", "oldPass", " "))
                 .isInstanceOf(ValidationException.class)
@@ -202,14 +218,12 @@ class TraineeServiceImplTest {
         when(traineeDao.findById(targetUser)).thenReturn(Optional.of(targetTrainee));
 
         traineeService.setActive(authUser, authPass, targetUser, true);
-
     }
 
     @Test
     void setActive_ShouldThrowValidationException_WhenTraineeNotFound() {
         mockAuthenticationSuccess();
         String targetUser = "unknown.trainee";
-
         when(traineeDao.findById(targetUser)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> traineeService.setActive(authUser, authPass, targetUser, true))
