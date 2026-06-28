@@ -1,6 +1,6 @@
 # Gym Management Service
 
-A Spring Boot REST API for managing gym trainees, trainers, and training sessions.
+A Spring Boot REST API for gym management, featuring JWT-based authentication, BCrypt password hashing, brute-force protection, and full CRUD operations for Trainees, Trainers, and Trainings.
 
 ## Tech Stack
 
@@ -73,10 +73,6 @@ Authentication uses `Authorization: Bearer <token>` on all protected endpoints.
 
 ```bash
 mvn test
-
-# Single class
 mvn test -Dtest=TraineeServiceImplTest
-
-# Single method
 mvn test -Dtest=TraineeServiceImplTest#create_ShouldSetUsernamePasswordAndActive_AndSave
 ```
