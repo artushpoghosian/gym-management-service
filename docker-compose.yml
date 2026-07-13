@@ -1,0 +1,87 @@
+name: gym-microservices
+
+networks:
+  gym-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gym-postgres
+    environment:
+      POSTGRES_DB: gymdb
+      POSTGRES_USER: gym
+      POSTGRES_PASSWORD: gym
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - gym-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gym -d gymdb"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  eureka-server:
+    image: gym/eureka-server:latest
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    networks:
+      - gym-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+
+  trainer-workload-service:
+    image: gym/trainer-workload-service:latest
+    container_name: trainer-workload-service
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-3600000}
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      EUREKA_PREFER_IP: "true"
+    ports:
+      - "8082:8082"
+    networks:
+      - gym-net
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8082"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+
+  gym-management-service:
+    image: gym/gym-management-service:latest
+    container_name: gym-management-service
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-3600000}
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      EUREKA_PREFER_IP: "true"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: gymdb
+      DB_USERNAME: gym
+      DB_PASSWORD: gym
+    ports:
+      - "8080:8080"
+    networks:
+      - gym-net
