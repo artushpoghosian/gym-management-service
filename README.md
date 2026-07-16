@@ -10,13 +10,13 @@ A multi-module Spring Boot 3.2 / Java 21 system for managing gym trainees, train
 | [`gym-management-service`](gym-main-service) | 8080 | Main REST app: trainees, trainers, trainings, JWT auth (H2 / PostgreSQL) |
 | [`trainer-workload-service`](trainer-workload-service) | 8082 | Tracks each trainer's monthly training minutes (in-memory) |
 
-**Flow:** when a training is created or deleted in the main service, it mints a short-lived service JWT, resolves `trainer-workload-service` via Eureka (load-balanced `RestTemplate`), and POSTs the workload change. A circuit breaker wraps that call — if the workload service is down, the training operation still succeeds and the notification is skipped.
+**Flow:** when a training is created or deleted in the main service, it POSTs the workload change through a declarative OpenFeign client resolved via Eureka. A Feign request interceptor attaches the short-lived service JWT and the `X-Transaction-Id` header to every outgoing call. A circuit breaker wraps the call — if the workload service is down, the training operation still succeeds and the notification is skipped.
 
 See [gym-main-service/README.md](gym-main-service/README.md) for the main service's endpoints and internals.
 
 ## Tech stack
 
-- Java 21 / Spring Boot 3.2, Spring Cloud 2023.0.3 (Eureka, LoadBalancer, Resilience4j)
+- Java 21 / Spring Boot 3.2, Spring Cloud 2023.0.3 (Eureka, OpenFeign, Resilience4j)
 - Spring Security 6 + JWT (JJWT 0.12), BCrypt
 - Hibernate / JPA — H2 (local) or PostgreSQL (Docker / non-local profiles)
 - Jib for container images, Docker Compose for orchestration
