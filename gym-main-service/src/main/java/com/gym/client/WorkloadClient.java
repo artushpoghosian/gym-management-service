@@ -1,6 +1,5 @@
 package com.gym.client;
 
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -10,17 +9,14 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class WorkloadClient {
 
-    private final WorkloadFeignClient workloadFeignClient;
+    private final WorkloadMessagePublisher workloadMessagePublisher;
 
-    @CircuitBreaker(name = "workloadService", fallbackMethod = "sendFallback")
     public void send(WorkloadRequest req) {
-        workloadFeignClient.sendWorkload(req);
-        log.info("Sent {} workload for trainer={}", req.getActionType(), req.getTrainerUsername());
-    }
-
-    @SuppressWarnings("unused")
-    void sendFallback(WorkloadRequest req, Throwable t) {
-        log.error("[CB] trainer-workload-service unreachable, skipping {} notification for trainer={}: {}",
-                req.getActionType(), req.getTrainerUsername(), t.getMessage());
+        try {
+            workloadMessagePublisher.publish(req);
+        } catch (Exception e) {
+            log.error("Failed to publish {} notification for trainer={}: {}",
+                    req.getActionType(), req.getTrainerUsername(), e.getMessage());
+        }
     }
 }

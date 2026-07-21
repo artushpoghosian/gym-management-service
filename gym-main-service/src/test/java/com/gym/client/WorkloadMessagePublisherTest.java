@@ -7,27 +7,33 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jms.core.JmsTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
-class WorkloadClientTest {
+class WorkloadMessagePublisherTest {
+
+    private static final String QUEUE = "trainer.workload.queue";
 
     @Mock
-    private WorkloadMessagePublisher workloadMessagePublisher;
+    private JmsTemplate jmsTemplate;
+
+    @Mock
+    private WorkloadMessagePostProcessor postProcessor;
 
     @InjectMocks
-    private WorkloadClient workloadClient;
+    private WorkloadMessagePublisher publisher;
 
     private WorkloadRequest request;
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(publisher, "queue", QUEUE);
         request = WorkloadRequest.builder()
                 .trainerUsername("trainer.jane")
                 .trainerFirstName("Jane")
@@ -40,19 +46,10 @@ class WorkloadClientTest {
     }
 
     @Test
-    @DisplayName("send() delegates to the message publisher")
-    void send_DelegatesToPublisher() {
-        workloadClient.send(request);
+    @DisplayName("publishes the request to the configured queue with the cross-cutting post-processor")
+    void publish_SendsToQueueWithPostProcessor() {
+        publisher.publish(request);
 
-        verify(workloadMessagePublisher).publish(request);
-    }
-
-    @Test
-    @DisplayName("send() swallows publish failures so the training operation still succeeds")
-    void send_SwallowsPublishFailure() {
-        doThrow(new RuntimeException("broker unreachable"))
-                .when(workloadMessagePublisher).publish(any(WorkloadRequest.class));
-
-        assertThatCode(() -> workloadClient.send(request)).doesNotThrowAnyException();
+        verify(jmsTemplate).convertAndSend(eq(QUEUE), eq(request), eq(postProcessor));
     }
 }
