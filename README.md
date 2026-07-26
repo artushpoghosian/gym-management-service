@@ -8,9 +8,9 @@ A multi-module Spring Boot 3.2 / Java 21 system for managing gym trainees, train
 |--------|------|------|
 | [`eureka-server`](eureka-server) | 8761 | Netflix Eureka service registry (discovery) |
 | [`gym-management-service`](gym-main-service) | 8080 | Main REST app: trainees, trainers, trainings, JWT auth (H2 / PostgreSQL) |
-| [`trainer-workload-service`](trainer-workload-service) | 8082 | Tracks each trainer's monthly training minutes (in-memory) |
+| [`trainer-workload-service`](trainer-workload-service) | 8082 | Tracks each trainer's monthly training minutes (MongoDB) |
 
-**Flow:** when a training is created or deleted in the main service (or a trainee is deleted), it publishes the workload change **asynchronously** to an ActiveMQ queue; the workload service consumes it with a JMS listener. Each message carries a service JWT and the `transactionId` (stamped by a single message post-processor). Because the queue is durable, if the workload service is down the messages **wait in the queue** and are processed on recovery — nothing is lost. Messages that fail validation (missing required data) are routed to a dead-letter queue (`trainer.workload.dlq`) instead of being dropped. Reading a trainer's summary stays synchronous REST.
+**Flow:** when a training is created or deleted in the main service (or a trainee is deleted), it publishes the workload change **asynchronously** to an ActiveMQ queue; the workload service consumes it with a JMS listener. Each message carries a service JWT and the `transactionId` (stamped by a single message post-processor). Because the queue is durable, if the workload service is down the messages **wait in the queue** and are processed on recovery — nothing is lost. Messages that fail validation (missing required data) are routed to a dead-letter queue (`trainer.workload.dlq`) instead of being dropped. The workload service stores each trainer's summary in **MongoDB** — one document per trainer with a nested `Years → Months → summary duration` structure — and applies each event as a single atomic update. Reading a trainer's summary stays synchronous REST.
 
 See [gym-main-service/README.md](gym-main-service/README.md) for the main service's endpoints and internals.
 
@@ -19,7 +19,8 @@ See [gym-main-service/README.md](gym-main-service/README.md) for the main servic
 - Java 21 / Spring Boot 3.2, Spring Cloud 2023.0.3 (Eureka)
 - ActiveMQ Classic (JMS) for asynchronous service-to-service messaging
 - Spring Security 6 + JWT (JJWT 0.12), BCrypt
-- Hibernate / JPA — H2 (local) or PostgreSQL (Docker / non-local profiles)
+- Hibernate / JPA — H2 (local) or PostgreSQL (Docker / non-local profiles) for the main service
+- Spring Data MongoDB — trainer workload store (Testcontainers for integration tests)
 - Jib for container images, Docker Compose for orchestration
 - Swagger / springdoc-openapi, Actuator + Prometheus
 
@@ -38,10 +39,11 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test            # run all tests
 
 ## Run locally (order matters)
 
-Export the **same** `JWT_SECRET` in every terminal (a hex string of at least 32 bytes; env vars do not carry between terminals). Start Eureka first, then the workload service, then the main service.
+Export the **same** `JWT_SECRET` in every terminal (a hex string of at least 32 bytes; env vars do not carry between terminals). The workload service needs a running **MongoDB** (defaults to `mongodb://localhost:27017/trainer_workload`; override with `MONGODB_URI`) — start one with `docker run -d -p 27017:27017 mongo:7`. Start Eureka first, then the workload service, then the main service.
 
 ```bash
 export JWT_SECRET=$(openssl rand -hex 32)   # same value in all three terminals
+docker run -d -p 27017:27017 mongo:7        # MongoDB for the workload service
 
 JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl eureka-server spring-boot:run
 JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl trainer-workload-service spring-boot:run
@@ -53,7 +55,7 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl gym-main-service spring-boot:r
 
 ## Run with Docker
 
-Images are built with Jib (no Dockerfiles); Compose runs the full stack including PostgreSQL (the main service uses the `docker` profile → Postgres instead of H2) and an ActiveMQ broker (console at http://localhost:8161, `admin`/`admin`).
+Images are built with Jib (no Dockerfiles); Compose runs the full stack including PostgreSQL (the main service uses the `docker` profile → Postgres instead of H2), **MongoDB** (the workload store), and an ActiveMQ broker (console at http://localhost:8161, `admin`/`admin`).
 
 ```bash
 cp .env.example .env            # then set JWT_SECRET (openssl rand -hex 32)
@@ -66,8 +68,8 @@ Compose injects one `JWT_SECRET` from `.env` into both services, so they can't d
 Stop it:
 
 ```bash
-docker compose down        # stop and remove containers (Postgres volume kept)
-docker compose down -v     # also wipe the Postgres data volume
+docker compose down        # stop and remove containers (Postgres + Mongo volumes kept)
+docker compose down -v     # also wipe the Postgres and Mongo data volumes
 ```
 
 ## End-to-end test
