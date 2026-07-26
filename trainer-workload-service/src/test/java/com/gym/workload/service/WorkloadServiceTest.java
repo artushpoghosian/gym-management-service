@@ -2,26 +2,28 @@ package com.gym.workload.service;
 
 import com.gym.workload.dto.ActionType;
 import com.gym.workload.dto.WorkloadRequest;
-import com.gym.workload.model.TrainerSummary;
-import com.gym.workload.store.TrainerSummaryStore;
+import com.gym.workload.repository.TrainerWorkloadRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class WorkloadServiceTest {
 
     private static final String USERNAME = "trainer.jane";
 
-    private TrainerSummaryStore store;
+    private TrainerWorkloadRepository repository;
     private WorkloadService workloadService;
 
     @BeforeEach
     void setUp() {
-        store = new TrainerSummaryStore();
-        workloadService = new WorkloadService(store);
+        repository = mock(TrainerWorkloadRepository.class);
+        workloadService = new WorkloadService(repository);
     }
 
     private WorkloadRequest request(ActionType action, LocalDate date, int minutes) {
@@ -36,73 +38,42 @@ class WorkloadServiceTest {
         return req;
     }
 
-    private long monthTotal(int year, int month) {
-        return store.find(USERNAME)
-                .map(s -> s.getYears().getOrDefault(year, java.util.Map.of()).getOrDefault(month, 0L))
-                .orElse(0L);
-    }
-
     @Test
-    void add_createsSummaryAndIncreasesMonthBucket() {
+    void add_delegatesToRepositoryWithSubtractFalse() {
         workloadService.process(request(ActionType.ADD, LocalDate.of(2026, 7, 10), 60));
 
-        assertThat(monthTotal(2026, 7)).isEqualTo(60);
+        verify(repository).applyWorkload("trainer.jane", "Jane", "Doe", true, 2026, 7, 60L, false);
     }
 
     @Test
-    void add_accumulatesInSameMonthBucket() {
-        workloadService.process(request(ActionType.ADD, LocalDate.of(2026, 7, 1), 60));
-        workloadService.process(request(ActionType.ADD, LocalDate.of(2026, 7, 20), 30));
+    void delete_delegatesToRepositoryWithSubtractTrue() {
+        workloadService.process(request(ActionType.DELETE, LocalDate.of(2026, 7, 10), 30));
 
-        assertThat(monthTotal(2026, 7)).isEqualTo(90);
+        verify(repository).applyWorkload("trainer.jane", "Jane", "Doe", true, 2026, 7, 30L, true);
     }
 
     @Test
-    void add_separatesDifferentMonthsAndYears() {
-        workloadService.process(request(ActionType.ADD, LocalDate.of(2026, 7, 1), 60));
-        workloadService.process(request(ActionType.ADD, LocalDate.of(2026, 8, 1), 45));
-        workloadService.process(request(ActionType.ADD, LocalDate.of(2027, 7, 1), 30));
+    void process_forwardsTrainerPersonalDataAndDate() {
+        WorkloadRequest req = request(ActionType.ADD, LocalDate.of(2027, 3, 5), 45);
+        req.setTrainerLastName("Smith");
+        req.setActive(false);
 
-        assertThat(monthTotal(2026, 7)).isEqualTo(60);
-        assertThat(monthTotal(2026, 8)).isEqualTo(45);
-        assertThat(monthTotal(2027, 7)).isEqualTo(30);
-    }
+        workloadService.process(req);
 
-    @Test
-    void delete_decreasesMonthBucket() {
-        workloadService.process(request(ActionType.ADD, LocalDate.of(2026, 7, 1), 90));
-        workloadService.process(request(ActionType.DELETE, LocalDate.of(2026, 7, 1), 30));
+        ArgumentCaptor<Integer> year = ArgumentCaptor.forClass(Integer.class);
+        ArgumentCaptor<Integer> month = ArgumentCaptor.forClass(Integer.class);
+        ArgumentCaptor<Long> minutes = ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<Boolean> subtract = ArgumentCaptor.forClass(Boolean.class);
+        verify(repository).applyWorkload(
+                org.mockito.ArgumentMatchers.eq("trainer.jane"),
+                org.mockito.ArgumentMatchers.eq("Jane"),
+                org.mockito.ArgumentMatchers.eq("Smith"),
+                org.mockito.ArgumentMatchers.eq(false),
+                year.capture(), month.capture(), minutes.capture(), subtract.capture());
 
-        assertThat(monthTotal(2026, 7)).isEqualTo(60);
-    }
-
-    @Test
-    void delete_neverGoesBelowZero() {
-        workloadService.process(request(ActionType.ADD, LocalDate.of(2026, 7, 1), 30));
-        workloadService.process(request(ActionType.DELETE, LocalDate.of(2026, 7, 1), 90));
-
-        assertThat(monthTotal(2026, 7)).isZero();
-    }
-
-    @Test
-    void delete_forUnknownTrainer_createsZeroedBucketNotNegative() {
-        workloadService.process(request(ActionType.DELETE, LocalDate.of(2026, 7, 1), 60));
-
-        assertThat(monthTotal(2026, 7)).isZero();
-    }
-
-    @Test
-    void process_updatesTrainerPersonalDataOnEveryCall() {
-        workloadService.process(request(ActionType.ADD, LocalDate.of(2026, 7, 1), 60));
-
-        WorkloadRequest updated = request(ActionType.ADD, LocalDate.of(2026, 7, 2), 30);
-        updated.setTrainerLastName("Smith");
-        updated.setActive(false);
-        workloadService.process(updated);
-
-        TrainerSummary summary = store.find(USERNAME).orElseThrow();
-        assertThat(summary.getFirstName()).isEqualTo("Jane");
-        assertThat(summary.getLastName()).isEqualTo("Smith");
-        assertThat(summary.isActive()).isFalse();
+        assertThat(year.getValue()).isEqualTo(2027);
+        assertThat(month.getValue()).isEqualTo(3);
+        assertThat(minutes.getValue()).isEqualTo(45L);
+        assertThat(subtract.getValue()).isFalse();
     }
 }

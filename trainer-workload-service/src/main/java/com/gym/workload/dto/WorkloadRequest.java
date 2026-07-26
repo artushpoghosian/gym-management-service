@@ -1,5 +1,6 @@
 package com.gym.workload.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -19,7 +20,9 @@ public class WorkloadRequest {
     @NotBlank
     private String trainerLastName;
 
-    private boolean isActive;
+    @NotNull
+    @JsonProperty("active")
+    private Boolean active;
 
     @NotNull
     private LocalDate trainingDate;

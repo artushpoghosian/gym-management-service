@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: trainer-workload-service
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/trainer_workload}
+      auto-index-creation: true
   activemq:
     broker-url: ${ACTIVEMQ_BROKER_URL:tcp://localhost:61616}
     user: ${ACTIVEMQ_USER:admin}

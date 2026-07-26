@@ -2,7 +2,6 @@ package com.gym.workload.rest;
 
 import com.gym.workload.dto.ActionType;
 import com.gym.workload.dto.WorkloadRequest;
-import com.gym.workload.messaging.DeadLetterPublisher;
 import com.gym.workload.security.JwtService;
 import com.gym.workload.service.WorkloadService;
 import jakarta.validation.Validation;
@@ -92,7 +91,6 @@ class WorkloadMessageListenerTest {
         invalid.setActionType(ActionType.ADD);
         invalid.setTrainingDate(LocalDate.of(2026, 7, 10));
         invalid.setTrainingDurationMinutes(60);
-        // trainerUsername / firstName / lastName left blank -> @NotBlank violations
 
         listenerWithRealValidator.onWorkloadMessage(invalid, VALID_TOKEN, "tx-123");
 
@@ -100,6 +98,29 @@ class WorkloadMessageListenerTest {
         ArgumentCaptor<String> reason = ArgumentCaptor.forClass(String.class);
         verify(deadLetterPublisher).send(eq(invalid), reason.capture());
         assertThat(reason.getValue()).contains("trainerUsername");
+    }
+
+    @Test
+    @DisplayName("missing trainer status (active) → not processed, routed to the DLQ")
+    void onWorkloadMessage_MissingActiveStatus_RoutedToDlq() {
+        Validator realValidator = Validation.buildDefaultValidatorFactory().getValidator();
+        WorkloadMessageListener listenerWithRealValidator =
+                new WorkloadMessageListener(workloadService, jwtService, realValidator, deadLetterPublisher);
+
+        WorkloadRequest missingActive = new WorkloadRequest();
+        missingActive.setTrainerUsername("trainer.jane");
+        missingActive.setTrainerFirstName("Jane");
+        missingActive.setTrainerLastName("Doe");
+        missingActive.setTrainingDate(LocalDate.of(2026, 7, 10));
+        missingActive.setTrainingDurationMinutes(60);
+        missingActive.setActionType(ActionType.ADD);
+
+        listenerWithRealValidator.onWorkloadMessage(missingActive, VALID_TOKEN, "tx-123");
+
+        verify(workloadService, never()).process(missingActive);
+        ArgumentCaptor<String> reason = ArgumentCaptor.forClass(String.class);
+        verify(deadLetterPublisher).send(eq(missingActive), reason.capture());
+        assertThat(reason.getValue()).contains("active");
     }
 
     @Test

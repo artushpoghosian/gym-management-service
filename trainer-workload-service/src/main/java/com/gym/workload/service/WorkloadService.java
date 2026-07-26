@@ -2,43 +2,32 @@ package com.gym.workload.service;
 
 import com.gym.workload.dto.ActionType;
 import com.gym.workload.dto.WorkloadRequest;
-import com.gym.workload.model.TrainerSummary;
-import com.gym.workload.store.TrainerSummaryStore;
+import com.gym.workload.repository.TrainerWorkloadRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class WorkloadService {
 
-    private final TrainerSummaryStore store;
+    private final TrainerWorkloadRepository repository;
 
     public void process(WorkloadRequest request) {
-        TrainerSummary summary = store.getOrCreate(request.getTrainerUsername());
-
-        summary.setFirstName(request.getTrainerFirstName());
-        summary.setLastName(request.getTrainerLastName());
-        summary.setActive(request.isActive());
-
         int year = request.getTrainingDate().getYear();
         int month = request.getTrainingDate().getMonthValue();
-        long duration = request.getTrainingDurationMinutes();
+        long minutes = request.getTrainingDurationMinutes();
+        boolean subtract = request.getActionType() == ActionType.DELETE;
 
-        Map<Integer, Long> months = summary.getYears()
-                .computeIfAbsent(year, k -> new ConcurrentHashMap<>());
+        repository.applyWorkload(
+                request.getTrainerUsername(),
+                request.getTrainerFirstName(),
+                request.getTrainerLastName(),
+                request.getActive(),
+                year, month, minutes, subtract);
 
-        if (request.getActionType() == ActionType.ADD) {
-            months.merge(month, duration, Long::sum);
-            log.info("ADD {} min for trainer={} {}/{}", duration, request.getTrainerUsername(), year, month);
-        } else {
-            months.compute(month, (k, current) ->
-                    current == null ? 0L : Math.max(0, current - duration));
-            log.info("DELETE {} min for trainer={} {}/{}", duration, request.getTrainerUsername(), year, month);
-        }
+        log.info("{} {} min for trainer={} {}/{}",
+                subtract ? "DELETE" : "ADD", minutes, request.getTrainerUsername(), year, month);
     }
 }

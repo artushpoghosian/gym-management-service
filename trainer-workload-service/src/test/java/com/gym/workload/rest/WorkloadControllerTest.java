@@ -1,11 +1,13 @@
 package com.gym.workload.rest;
 
+import com.gym.workload.document.MonthSummary;
+import com.gym.workload.document.TrainerWorkload;
+import com.gym.workload.document.YearSummary;
 import com.gym.workload.config.TestSecurityConfig;
-import com.gym.workload.model.TrainerSummary;
+import com.gym.workload.repository.TrainerWorkloadRepository;
 import com.gym.workload.security.JwtAuthenticationFilter;
 import com.gym.workload.security.JwtService;
 import com.gym.workload.security.WorkloadUserDetailsService;
-import com.gym.workload.store.TrainerSummaryStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,9 +20,8 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.Map;
+import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
@@ -36,7 +37,7 @@ class WorkloadControllerTest {
     private MockMvc mockMvc;
 
     @MockBean
-    private TrainerSummaryStore store;
+    private TrainerWorkloadRepository repository;
 
     @MockBean
     private JwtService jwtService;
@@ -62,25 +63,60 @@ class WorkloadControllerTest {
     @Test
     @DisplayName("GET 200 OK – returns summary for known trainer")
     void get_knownTrainer_returns200() throws Exception {
-        TrainerSummary summary = new TrainerSummary();
-        summary.setUsername("trainer.jane");
-        summary.setFirstName("Jane");
-        summary.setLastName("Doe");
-        summary.setActive(true);
-        summary.setYears(new ConcurrentHashMap<>(Map.of(2026, new ConcurrentHashMap<>(Map.of(7, 60L)))));
-        when(store.find("trainer.jane")).thenReturn(Optional.of(summary));
+        TrainerWorkload workload = new TrainerWorkload();
+        workload.setUsername("trainer.jane");
+        workload.setFirstName("Jane");
+        workload.setLastName("Doe");
+        workload.setActive(true);
+        workload.setYears(List.of(new YearSummary(2026, List.of(new MonthSummary(7, 60L)))));
+        when(repository.findByUsername("trainer.jane")).thenReturn(Optional.of(workload));
 
         mockMvc.perform(get("/api/trainer-workload/{username}", "trainer.jane")
                         .header(HttpHeaders.AUTHORIZATION, bearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("trainer.jane"))
-                .andExpect(jsonPath("$.years.2026.7").value(60));
+                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.years[0].year").value(2026))
+                .andExpect(jsonPath("$.years[0].months[0].month").value(7))
+                .andExpect(jsonPath("$.years[0].months[0].summaryDuration").value(60));
+    }
+
+    @Test
+    @DisplayName("GET /search 200 OK – returns trainers matching first + last name")
+    void search_byName_returnsMatches() throws Exception {
+        TrainerWorkload workload = new TrainerWorkload();
+        workload.setUsername("trainer.jane");
+        workload.setFirstName("Jane");
+        workload.setLastName("Doe");
+        when(repository.findByFirstNameAndLastName("Jane", "Doe")).thenReturn(List.of(workload));
+
+        mockMvc.perform(get("/api/trainer-workload/search")
+                        .param("firstName", "Jane")
+                        .param("lastName", "Doe")
+                        .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].username").value("trainer.jane"))
+                .andExpect(jsonPath("$[0].firstName").value("Jane"))
+                .andExpect(jsonPath("$[0].lastName").value("Doe"));
+    }
+
+    @Test
+    @DisplayName("GET /search 200 OK – empty array when no trainer matches")
+    void search_byName_noMatch_returnsEmptyArray() throws Exception {
+        when(repository.findByFirstNameAndLastName("No", "Body")).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/trainer-workload/search")
+                        .param("firstName", "No")
+                        .param("lastName", "Body")
+                        .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test
     @DisplayName("GET 404 Not Found – unknown trainer")
     void get_unknownTrainer_returns404() throws Exception {
-        when(store.find("nobody")).thenReturn(Optional.empty());
+        when(repository.findByUsername("nobody")).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/trainer-workload/{username}", "nobody")
                         .header(HttpHeaders.AUTHORIZATION, bearer()))

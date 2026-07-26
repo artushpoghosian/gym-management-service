@@ -6,6 +6,7 @@ networks:
 
 volumes:
   pgdata:
+  mongodata:
 
 services:
   postgres:
@@ -25,6 +26,22 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
+
+  mongo:
+    image: mongo:7
+    container_name: gym-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    networks:
+      - gym-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
 
   activemq:
     image: apache/activemq-classic:latest
@@ -63,6 +80,8 @@ services:
         condition: service_healthy
       activemq:
         condition: service_healthy
+      mongo:
+        condition: service_healthy
     environment:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-3600000}
@@ -71,6 +90,7 @@ services:
       ACTIVEMQ_BROKER_URL: ${ACTIVEMQ_BROKER_URL}
       ACTIVEMQ_USER: ${ACTIVEMQ_USER}
       ACTIVEMQ_PASSWORD: ${ACTIVEMQ_PASSWORD}
+      MONGODB_URI: mongodb://mongo:27017/trainer_workload
     ports:
       - "8082:8082"
     networks:
