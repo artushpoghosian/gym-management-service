@@ -34,8 +34,14 @@ See [gym-main-service/README.md](gym-main-service/README.md) for the main servic
 
 ```bash
 JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean package   # build all modules
-JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test            # run all tests
+JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test            # fast: unit + slice tests
+JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean verify    # + Cucumber BDD suites (needs Docker)
 ```
+
+Tests come in three layers: JUnit/Mockito unit + slice tests (`mvn test`), Cucumber **component**
+tests per service, and a Cucumber **integration** suite that runs both services together — the
+BDD suites run at `verify` on Testcontainers (Postgres, Mongo, ActiveMQ), so Docker must be
+running. See the "Testing (three layers)" section in [CLAUDE.md](CLAUDE.md) for details.
 
 ## Run locally (order matters)
 
