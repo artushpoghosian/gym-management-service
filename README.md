@@ -39,9 +39,10 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean verify    # + Cucumber BDD s
 ```
 
 Tests come in three layers: JUnit/Mockito unit + slice tests (`mvn test`), Cucumber **component**
-tests per service, and a Cucumber **integration** suite that runs both services together — the
-BDD suites run at `verify` on Testcontainers (Postgres, Mongo, ActiveMQ), so Docker must be
-running. See the "Testing (three layers)" section in [CLAUDE.md](CLAUDE.md) for details.
+tests per service, and a Cucumber **integration** suite that runs both services together. The
+Cucumber suites are named `*IT` and run at the `verify` phase (Failsafe) on Testcontainers
+(Postgres, Mongo, ActiveMQ), so Docker must be running for `mvn verify`. Feature files live under
+each module's `src/test/resources/features/`.
 
 ## Run locally (order matters)
 
