@@ -1,7 +1,5 @@
 package com.gym.config;
 
-import com.gym.security.BruteForceAuthFailureHandler;
-import com.gym.security.BruteForceAuthSuccessHandler;
 import com.gym.security.GymUserDetailsService;
 import com.gym.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
@@ -34,8 +32,6 @@ public class SecurityConfig {
     private final GymUserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final BruteForceAuthFailureHandler authFailureHandler;
-    private final BruteForceAuthSuccessHandler authSuccessHandler;
 
     @Value("${cors.allowed-origins:*}")
     private String allowedOrigins;
@@ -60,9 +56,6 @@ public class SecurityConfig {
             )
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-            .formLogin(form -> form
-                .successHandler(authSuccessHandler)
-                .failureHandler(authFailureHandler))
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint((request, response, authException) -> {
                     response.setContentType("application/json");
