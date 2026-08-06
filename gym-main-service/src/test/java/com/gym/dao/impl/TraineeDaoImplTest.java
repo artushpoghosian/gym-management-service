@@ -15,12 +15,13 @@ import jakarta.persistence.criteria.Root;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
 import java.time.LocalDate;
-import java.util.ArrayList;
+import java.time.Month;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,20 +42,23 @@ class TraineeDaoImplTest {
     @Mock
     private EntityManager entityManager;
 
-    @InjectMocks
     private TraineeDaoImpl traineeDao;
 
     private Trainee trainee;
 
     @BeforeEach
     void setUp() {
+        traineeDao = new TraineeDaoImpl(Clock.systemDefaultZone(), null);
+        ReflectionTestUtils.setField(traineeDao, "entityManager", entityManager);
+        ReflectionTestUtils.setField(traineeDao, "self", traineeDao);
+
         trainee = new Trainee();
         trainee.setId(1L);
         trainee.setFirstName("Alice");
         trainee.setLastName("Brown");
         trainee.setUsername("alice.brown");
         trainee.setPassword("password123");
-        trainee.setDateOfBirth(LocalDate.of(1995, 4, 12));
+        trainee.setDateOfBirth(LocalDate.of(1995, Month.APRIL, 12));
         trainee.setAddress("123 Main St");
         trainee.setActive(true);
     }

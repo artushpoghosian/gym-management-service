@@ -26,7 +26,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/trainees")
@@ -146,7 +145,7 @@ public class TraineeEndpoint {
 
         List<TrainerShortDto> dtos = trainers.stream()
                 .map(t -> new TrainerShortDto(t.getUsername(), t.getFirstName(), t.getLastName(), t.getSpecialization().name()))
-                .collect(Collectors.toList());
+                .toList();
 
         return ResponseEntity.ok(dtos);
     }
@@ -160,7 +159,7 @@ public class TraineeEndpoint {
             @RequestBody List<String> trainerUsernames) {
 
         log.info("Endpoint: Updating assigned trainers for trainee: {}", username);
-        Trainee trainee = gymFacade.updateTraineeTrainersList(authUser, authPass, username, trainerUsernames);
+        gymFacade.updateTraineeTrainersList(authUser, authPass, username, trainerUsernames);
 
         return ResponseEntity.ok(List.of());
     }
@@ -188,7 +187,7 @@ public class TraineeEndpoint {
             dto.setTrainingDuration(t.getTrainingDuration());
             dto.setTrainerName(t.getTrainer().getUsername());
             return dto;
-        }).collect(Collectors.toList());
+        }).toList();
 
         return ResponseEntity.ok(responseList);
     }

@@ -18,11 +18,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Optional;
 
@@ -58,7 +59,6 @@ class TrainingServiceImplTest {
     @Mock
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
-    @InjectMocks
     private TrainingServiceImpl trainingService;
 
     private Training training;
@@ -67,6 +67,11 @@ class TrainingServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        trainingService = new TrainingServiceImpl(
+                trainingDao, traineeDao, trainerDao,
+                meterRegistry, workloadClient, passwordEncoder, null);
+        ReflectionTestUtils.setField(trainingService, "self", trainingService);
+
         Trainee trainee = new Trainee();
         trainee.setUsername("trainee.one");
 
@@ -76,7 +81,7 @@ class TrainingServiceImplTest {
         training = new Training();
         training.setId(1L);
         training.setTrainingName("Morning Yoga");
-        training.setTrainingDate(LocalDate.of(2026, 6, 1));
+        training.setTrainingDate(LocalDate.of(2026, Month.JUNE, 1));
         training.setTrainingDuration(60);
         training.setTrainee(trainee);
         training.setTrainer(trainer);

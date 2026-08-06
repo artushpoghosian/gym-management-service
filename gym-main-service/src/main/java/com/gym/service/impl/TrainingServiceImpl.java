@@ -11,8 +11,8 @@ import com.gym.exception.ValidationException;
 import com.gym.model.Training;
 import com.gym.service.TrainingService;
 import io.micrometer.core.instrument.MeterRegistry;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class TrainingServiceImpl implements TrainingService {
 
@@ -31,6 +30,23 @@ public class TrainingServiceImpl implements TrainingService {
     private final MeterRegistry meterRegistry;
     private final WorkloadClient workloadClient;
     private final PasswordEncoder passwordEncoder;
+    private final TrainingService self;
+
+    public TrainingServiceImpl(TrainingDao trainingDao,
+                               TraineeDao traineeDao,
+                               TrainerDao trainerDao,
+                               MeterRegistry meterRegistry,
+                               WorkloadClient workloadClient,
+                               PasswordEncoder passwordEncoder,
+                               @Lazy TrainingService self) {
+        this.trainingDao = trainingDao;
+        this.traineeDao = traineeDao;
+        this.trainerDao = trainerDao;
+        this.meterRegistry = meterRegistry;
+        this.workloadClient = workloadClient;
+        this.passwordEncoder = passwordEncoder;
+        this.self = self;
+    }
 
     @Override
     @Transactional
@@ -100,8 +116,7 @@ public class TrainingServiceImpl implements TrainingService {
 
     @Override
     public Optional<Training> selectTraining(String trainingName) {
-        log.info("Finding Training with name: {}", trainingName);
-        return trainingDao.findByName(trainingName);
+        return self.findByName(trainingName);
     }
 
     private void authenticate(String username, String password) {

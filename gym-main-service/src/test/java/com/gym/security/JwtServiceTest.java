@@ -3,6 +3,8 @@ package com.gym.security;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtServiceTest {
@@ -10,12 +12,13 @@ class JwtServiceTest {
     private static final String TEST_SECRET_HEX =
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     private static final long EXPIRATION_MS = 3_600_000L;
+    private static final Clock CLOCK = Clock.systemDefaultZone();
 
     private JwtService jwtService;
 
     @BeforeEach
     void setUp() {
-        jwtService = new JwtService(TEST_SECRET_HEX, EXPIRATION_MS);
+        jwtService = new JwtService(TEST_SECRET_HEX, EXPIRATION_MS, CLOCK);
     }
 
     @Test
@@ -38,7 +41,7 @@ class JwtServiceTest {
 
     @Test
     void isValid_ReturnsFalseForExpiredToken() {
-        JwtService shortLived = new JwtService(TEST_SECRET_HEX, -1000L);
+        JwtService shortLived = new JwtService(TEST_SECRET_HEX, -1000L, CLOCK);
         String token = shortLived.generateToken("john.doe");
         assertThat(jwtService.isValid(token)).isFalse();
     }
@@ -76,7 +79,7 @@ class JwtServiceTest {
 
     @Test
     void generateServiceToken_UsesOwnTtlIndependentOfConfiguredExpiration() {
-        JwtService negativeUserExpiry = new JwtService(TEST_SECRET_HEX, -1000L);
+        JwtService negativeUserExpiry = new JwtService(TEST_SECRET_HEX, -1000L, CLOCK);
         String token = negativeUserExpiry.generateServiceToken();
         assertThat(negativeUserExpiry.isValid(token)).isTrue();
     }

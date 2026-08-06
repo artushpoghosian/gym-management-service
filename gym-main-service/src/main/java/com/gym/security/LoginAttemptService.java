@@ -40,11 +40,11 @@ public class LoginAttemptService {
     }
 
     public boolean isBlocked(String username) {
-        AttemptRecord record = attempts.get(username);
-        if (record == null) {
+        AttemptRecord attempt = attempts.get(username);
+        if (attempt == null) {
             return false;
         }
-        if (record.lockedUntil().isAfter(Instant.now())) {
+        if (attempt.lockedUntil().isAfter(Instant.now())) {
             log.warn("Blocked login attempt for locked user '{}'", username);
             return true;
         }

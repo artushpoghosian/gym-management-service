@@ -28,7 +28,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/trainers")
@@ -146,7 +145,7 @@ public class TrainerEndpoint {
                 dto.setTrainerName(t.getTrainee().getUsername());
             }
             return dto;
-        }).collect(Collectors.toList());
+        }).toList();
 
         return ResponseEntity.ok(responseList);
     }
@@ -177,7 +176,7 @@ public class TrainerEndpoint {
             dto.setLastName(t.getLastName());
             dto.setSpecialization(t.getSpecialization().name());
             return dto;
-        }).collect(Collectors.toList());
+        }).toList();
 
         return ResponseEntity.ok(responseList);
     }

@@ -35,7 +35,7 @@ public class AuthEndpoint {
     private final TokenBlacklistService tokenBlacklistService;
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequestDto request) {
+    public ResponseEntity<Object> login(@Valid @RequestBody LoginRequestDto request) {
         String username = request.getUsername();
         log.info("Login attempt for username: {}", username);
 

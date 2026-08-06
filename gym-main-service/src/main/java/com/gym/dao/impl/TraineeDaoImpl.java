@@ -13,9 +13,11 @@ import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,8 +27,18 @@ import java.util.Optional;
 @Slf4j
 public class TraineeDaoImpl implements TraineeDao {
 
+    private static final String USERNAME = "username";
+
     @PersistenceContext
     private EntityManager entityManager;
+
+    private final Clock clock;
+    private final TraineeDao self;
+
+    public TraineeDaoImpl(Clock clock, @Lazy TraineeDao self) {
+        this.clock = clock;
+        this.self = self;
+    }
 
     @Override
     @Transactional
@@ -50,7 +62,7 @@ public class TraineeDaoImpl implements TraineeDao {
     @Transactional
     public void delete(String username) {
         log.debug("Deleting trainee with username: {}", username);
-        findById(username).ifPresent(trainee -> entityManager.remove(
+        self.findById(username).ifPresent(trainee -> entityManager.remove(
                 entityManager.contains(trainee) ? trainee : entityManager.merge(trainee)
         ));
     }
@@ -61,7 +73,7 @@ public class TraineeDaoImpl implements TraineeDao {
         log.info("Finding trainee with username: {}", username);
         List<Trainee> result = entityManager
                 .createQuery("SELECT t FROM Trainee t WHERE t.username = :username", Trainee.class)
-                .setParameter("username", username)
+                .setParameter(USERNAME, username)
                 .getResultList();
         return result.isEmpty() ? Optional.empty() : Optional.of(result.get(0));
     }
@@ -79,7 +91,7 @@ public class TraineeDaoImpl implements TraineeDao {
         log.debug("Checking if username: {} exists", username);
         Long count = entityManager
                 .createQuery("SELECT COUNT(t) FROM Trainee t WHERE t.username = :username", Long.class)
-                .setParameter("username", username)
+                .setParameter(USERNAME, username)
                 .getSingleResult();
         return count > 0;
     }
@@ -90,7 +102,7 @@ public class TraineeDaoImpl implements TraineeDao {
         log.info("Updating password for username: {}", username);
         entityManager.createQuery("UPDATE User u SET u.password = :password WHERE u.username = :username")
                 .setParameter("password", newPassword)
-                .setParameter("username", username)
+                .setParameter(USERNAME, username)
                 .executeUpdate();
     }
 
@@ -100,7 +112,7 @@ public class TraineeDaoImpl implements TraineeDao {
         log.info("Updating active status to {} for username: {}", isActive, username);
         entityManager.createQuery("UPDATE User u SET u.isActive = :isActive WHERE u.username = :username")
                 .setParameter("isActive", isActive)
-                .setParameter("username", username)
+                .setParameter(USERNAME, username)
                 .executeUpdate();
     }
 
@@ -116,7 +128,7 @@ public class TraineeDaoImpl implements TraineeDao {
         List<Predicate> predicates = new ArrayList<>();
 
         Join<Training, Trainee> traineeJoin = root.join("trainee");
-        predicates.add(cb.equal(traineeJoin.get("username"), username));
+        predicates.add(cb.equal(traineeJoin.get(USERNAME), username));
 
         if (fromDate != null) {
             predicates.add(cb.greaterThanOrEqualTo(root.get("trainingDate"), fromDate));
@@ -126,7 +138,7 @@ public class TraineeDaoImpl implements TraineeDao {
         }
         if (trainerName != null && !trainerName.trim().isEmpty()) {
             Join<Training, Trainer> trainerJoin = root.join("trainer");
-            predicates.add(cb.equal(trainerJoin.get("username"), trainerName));
+            predicates.add(cb.equal(trainerJoin.get(USERNAME), trainerName));
         }
         if (trainingTypeName != null && !trainingTypeName.trim().isEmpty()) {
             try {
@@ -151,7 +163,7 @@ public class TraineeDaoImpl implements TraineeDao {
                                 "LEFT JOIN Training tg ON tg.trainer = tr AND tg.trainee.username = :username " +
                                 "WHERE tg.id IS NULL",
                         Trainer.class)
-                .setParameter("username", username)
+                .setParameter(USERNAME, username)
                 .getResultList();
     }
 
@@ -160,7 +172,7 @@ public class TraineeDaoImpl implements TraineeDao {
     public void updateTraineeTrainers(String username, List<Trainer> trainers) {
         log.info("Updating trainers via training assignments for trainee: {}", username);
 
-        findById(username).ifPresent(trainee -> {
+        self.findById(username).ifPresent(trainee -> {
             for (Trainer trainer : trainers) {
 
                 Long count = entityManager.createQuery(
@@ -176,7 +188,7 @@ public class TraineeDaoImpl implements TraineeDao {
                     training.setTrainer(trainer);
                     training.setTrainingName("Default Assignment Session");
                     training.setTrainingType(trainer.getSpecialization());
-                    training.setTrainingDate(LocalDate.now());
+                    training.setTrainingDate(LocalDate.now(clock));
                     training.setTrainingDuration(60);
                     entityManager.persist(training);
                 }

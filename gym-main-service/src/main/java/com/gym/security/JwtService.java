@@ -9,44 +9,39 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Date;
 import java.util.HexFormat;
 
 @Service
 @Slf4j
+@SuppressWarnings("java:S2143") // JJWT 0.12.x builder + Claims accept only java.util.Date; converted at the boundary via Date.from(Instant).
 public class JwtService {
 
+    private static final String SERVICE_SUBJECT = "gym-management-service";
+    private static final Duration SERVICE_TOKEN_TTL = Duration.ofMinutes(1);
+
     private final SecretKey signingKey;
-    private final long expirationMs;
+    private final Duration expiration;
+    private final Clock clock;
 
     public JwtService(
             @Value("${jwt.secret}") String secretHex,
-            @Value("${jwt.expiration-ms}") long expirationMs) {
+            @Value("${jwt.expiration-ms}") long expirationMs,
+            Clock clock) {
         this.signingKey = Keys.hmacShaKeyFor(HexFormat.of().parseHex(secretHex));
-        this.expirationMs = expirationMs;
+        this.expiration = Duration.ofMillis(expirationMs);
+        this.clock = clock;
     }
 
-    private static final String SERVICE_SUBJECT = "gym-management-service";
-    private static final long SERVICE_TOKEN_TTL_MS = 60_000;
-
     public String generateToken(String username) {
-        Date now = new Date();
-        return Jwts.builder()
-                .subject(username)
-                .issuedAt(now)
-                .expiration(new Date(now.getTime() + expirationMs))
-                .signWith(signingKey)
-                .compact();
+        return buildToken(username, expiration);
     }
 
     public String generateServiceToken() {
-        Date now = new Date();
-        return Jwts.builder()
-                .subject(SERVICE_SUBJECT)
-                .issuedAt(now)
-                .expiration(new Date(now.getTime() + SERVICE_TOKEN_TTL_MS))
-                .signWith(signingKey)
-                .compact();
+        return buildToken(SERVICE_SUBJECT, SERVICE_TOKEN_TTL);
     }
 
     public String extractUsername(String token) {
@@ -55,12 +50,22 @@ public class JwtService {
 
     public boolean isValid(String token) {
         try {
-            Date expiration = parseClaims(token).getExpiration();
-            return expiration.after(new Date());
+            Instant expiresAt = parseClaims(token).getExpiration().toInstant();
+            return expiresAt.isAfter(clock.instant());
         } catch (JwtException | IllegalArgumentException e) {
             log.warn("Invalid JWT token: {}", e.getMessage());
             return false;
         }
+    }
+
+    private String buildToken(String subject, Duration ttl) {
+        Instant now = clock.instant();
+        return Jwts.builder()
+                .subject(subject)
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plus(ttl)))
+                .signWith(signingKey)
+                .compact();
     }
 
     private Claims parseClaims(String token) {

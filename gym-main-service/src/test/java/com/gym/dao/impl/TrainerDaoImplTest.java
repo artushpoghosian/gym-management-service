@@ -15,9 +15,9 @@ import jakarta.persistence.criteria.Root;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -39,13 +39,16 @@ class TrainerDaoImplTest {
     @Mock
     private EntityManager entityManager;
 
-    @InjectMocks
     private TrainerDaoImpl trainerDao;
 
     private Trainer trainer;
 
     @BeforeEach
     void setUp() {
+        trainerDao = new TrainerDaoImpl(null);
+        ReflectionTestUtils.setField(trainerDao, "entityManager", entityManager);
+        ReflectionTestUtils.setField(trainerDao, "self", trainerDao);
+
         trainer = new Trainer();
         trainer.setId(1L);
         trainer.setFirstName("John");

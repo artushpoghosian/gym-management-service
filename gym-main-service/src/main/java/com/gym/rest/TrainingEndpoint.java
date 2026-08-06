@@ -26,7 +26,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
@@ -80,7 +79,7 @@ public class TrainingEndpoint {
 
         List<TrainingTypeDto> types = Arrays.stream(TrainingType.values())
                 .map(type -> new TrainingTypeDto(type.name(), (long) type.ordinal() + 1))
-                .collect(Collectors.toList());
+                .toList();
 
         return ResponseEntity.ok(types);
     }
