@@ -9,15 +9,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Date;
 import java.util.HexFormat;
 
 @Service
 @Slf4j
-@SuppressWarnings("java:S2143") // JJWT 0.12.x builder + Claims accept only java.util.Date; converted at the boundary via Date.from(Instant).
 public class JwtService {
 
     private static final String SERVICE_SUBJECT = "gym-management-service";
@@ -62,8 +61,8 @@ public class JwtService {
         Instant now = clock.instant();
         return Jwts.builder()
                 .subject(subject)
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(ttl)))
+                .issuedAt(Timestamp.from(now))
+                .expiration(Timestamp.from(now.plus(ttl)))
                 .signWith(signingKey)
                 .compact();
     }
