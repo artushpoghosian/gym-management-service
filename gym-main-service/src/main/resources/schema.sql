@@ -41,6 +41,6 @@ CREATE TABLE IF NOT EXISTS trainings (
                                          training_type     VARCHAR(50)  NOT NULL,
                                          training_date     DATE         NOT NULL,
                                          training_duration INT          NOT NULL,
-                                         CONSTRAINT fk_training_trainer FOREIGN KEY (trainer_id) REFERENCES trainers(user_id),
-                                         CONSTRAINT fk_training_trainee FOREIGN KEY (trainee_id) REFERENCES trainees(user_id)
+                                         CONSTRAINT fk_training_trainer FOREIGN KEY (trainer_id) REFERENCES trainers(user_id) ON DELETE CASCADE,
+                                         CONSTRAINT fk_training_trainee FOREIGN KEY (trainee_id) REFERENCES trainees(user_id) ON DELETE CASCADE
 );

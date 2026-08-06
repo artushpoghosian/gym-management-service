@@ -30,6 +30,22 @@ public class ApiClient {
         return rest.exchange(path, HttpMethod.POST, new HttpEntity<>(toJson(body), headers), String.class);
     }
 
+    public ResponseEntity<String> get(String path, HttpHeaders headers) {
+        return rest.exchange(path, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+    }
+
+    public ResponseEntity<String> delete(String path, HttpHeaders headers) {
+        return rest.exchange(path, HttpMethod.DELETE, new HttpEntity<>(headers), String.class);
+    }
+
+    public HttpHeaders bearer(String token) {
+        HttpHeaders headers = new HttpHeaders();
+        if (token != null) {
+            headers.setBearerAuth(token);
+        }
+        return headers;
+    }
+
     public JsonNode read(ResponseEntity<String> response) {
         try {
             return mapper.readTree(response.getBody());

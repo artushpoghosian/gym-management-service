@@ -17,6 +17,8 @@ public class ScenarioContext {
 
     private final Map<String, String> credentials = new HashMap<>();
     private String lastUsername;
+    private String trainerUsername;
+    private String traineeUsername;
     private String token;
     private ResponseEntity<String> lastResponse;
 

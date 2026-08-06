@@ -1,17 +1,19 @@
 package com.gym.bdd.support;
 
 import io.cucumber.java.Before;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+@RequiredArgsConstructor
 public class TestDataReset {
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate;
+    private final PublishedWorkloadMessages publishedWorkloadMessages;
 
     @Before(order = 0)
-    public void resetDatabase() {
+    public void reset() {
         jdbcTemplate.execute(
                 "TRUNCATE TABLE trainings, trainee_trainer, trainees, trainers, users RESTART IDENTITY CASCADE");
+        publishedWorkloadMessages.clear();
     }
 }
