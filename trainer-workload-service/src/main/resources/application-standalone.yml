@@ -1,0 +1,24 @@
+spring:
+  data:
+    mongodb:
+      auto-index-creation: false
+  jms:
+    listener:
+      auto-startup: false
+
+eureka:
+  client:
+    enabled: false
+
+management:
+  health:
+    jms:
+      enabled: false
+    mongo:
+      enabled: false
+    discovery:
+      enabled: false
+
+logging:
+  level:
+    org.mongodb.driver: WARN

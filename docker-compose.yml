@@ -60,6 +60,9 @@ services:
 
   eureka-server:
     image: gym/eureka-server:latest
+    build:
+      context: .
+      dockerfile: eureka-server/Dockerfile
     container_name: eureka-server
     ports:
       - "8761:8761"
@@ -74,6 +77,9 @@ services:
 
   trainer-workload-service:
     image: gym/trainer-workload-service:latest
+    build:
+      context: .
+      dockerfile: trainer-workload-service/Dockerfile
     container_name: trainer-workload-service
     depends_on:
       eureka-server:
@@ -96,14 +102,19 @@ services:
     networks:
       - gym-net
     healthcheck:
-      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8082"]
-      interval: 10s
+      test: ["CMD", "bash", "-c", "curl -s -o /dev/null -w '%{http_code}' http://localhost:8082/actuator/health | grep -q 401"]
+      # 30s, not 10s: every probe hits the REST path, and TransactionIdFilter logs a
+      # [TX-START]/[TX-END] pair for it — a 10s interval buries the [MQ] lines.
+      interval: 30s
       timeout: 3s
       retries: 10
       start_period: 20s
 
   gym-management-service:
     image: gym/gym-management-service:latest
+    build:
+      context: .
+      dockerfile: gym-main-service/Dockerfile
     container_name: gym-management-service
     depends_on:
       eureka-server:
@@ -130,3 +141,9 @@ services:
       - "8080:8080"
     networks:
       - gym-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s

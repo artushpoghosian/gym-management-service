@@ -1,0 +1,26 @@
+# Build output — the image builds the jar itself, host artifacts must not leak in
+target/
+*/target/
+integration-tests/target/
+
+# VCS and IDE
+.git/
+.gitignore
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Secrets and local env
+.env
+*.env
+!.env.example
+
+# Docs / scratch — not needed to compile
+docs/
+*.md
+!README.md
+.DS_Store
+
+# Docker's own files
+docker-compose.yml

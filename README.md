@@ -21,7 +21,7 @@ See [gym-main-service/README.md](gym-main-service/README.md) for the main servic
 - Spring Security 6 + JWT (JJWT 0.12), BCrypt
 - Hibernate / JPA — H2 (local) or PostgreSQL (Docker / non-local profiles) for the main service
 - Spring Data MongoDB — trainer workload store (Testcontainers for integration tests)
-- Jib for container images, Docker Compose for orchestration
+- Dockerfiles (multi-stage) and Jib for container images, Docker Compose for orchestration
 - Swagger / springdoc-openapi, Actuator + Prometheus
 
 ## Prerequisites
@@ -62,11 +62,12 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl gym-main-service spring-boot:r
 
 ## Run with Docker
 
-Images are built with Jib (no Dockerfiles); Compose runs the full stack including PostgreSQL (the main service uses the `docker` profile → Postgres instead of H2), **MongoDB** (the workload store), and an ActiveMQ broker (console at http://localhost:8161, `admin`/`admin`).
+Images are built two ways: hand-written multi-stage `Dockerfile`s in each service module (what `docker compose up --build` uses) and Jib. Both produce the same `gym/*:latest` names. See **[DOCKER.md](DOCKER.md)** for the full local-Docker runbook — building the images, running a single service with its integrations disabled, the network setup, and reading the container logs. Compose runs the full stack including PostgreSQL (the main service uses the `docker` profile → Postgres instead of H2), **MongoDB** (the workload store), and an ActiveMQ broker (console at http://localhost:8161, `admin`/`admin`).
 
 ```bash
 cp .env.example .env            # then set JWT_SECRET (openssl rand -hex 32)
-JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean package jib:dockerBuild
+docker compose up -d --build                                          # build from the Dockerfiles
+JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean package jib:dockerBuild   # or build with Jib
 docker compose up -d
 ```
 
