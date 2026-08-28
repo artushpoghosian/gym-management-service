@@ -61,7 +61,6 @@ public class JwtService {
         Instant now = clock.instant();
         return Jwts.builder()
                 .subject(subject)
-                // JJWT 0.12 takes java.util.Date here; everything internal stays Instant/Clock
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(ttl)))
                 .signWith(signingKey)
