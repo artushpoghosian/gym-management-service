@@ -14,6 +14,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class TrainerWorkloadRepositoryImpl implements TrainerWorkloadRepositoryCustom {
 
+    private static final String COND = "$cond";
+
     private final MongoTemplate mongoTemplate;
 
     @Override
@@ -23,8 +25,12 @@ public class TrainerWorkloadRepositoryImpl implements TrainerWorkloadRepositoryC
     }
 
     @Override
-    public void applyWorkload(String username, String firstName, String lastName, boolean active,
-                              int year, int month, long minutes, boolean subtract) {
+    public void applyWorkload(TrainerInfo trainer, WorkloadDelta delta) {
+
+        int year = delta.year();
+        int month = delta.month();
+        long minutes = delta.minutes();
+        boolean subtract = delta.subtract();
 
         long freshDuration = subtract ? 0L : minutes;
         Document newMonth = new Document("month", month).append("summaryDuration", freshDuration);
@@ -33,10 +39,10 @@ public class TrainerWorkloadRepositoryImpl implements TrainerWorkloadRepositoryC
                 ? new Document("$max", List.of(0L, new Document("$subtract", List.of("$$m.summaryDuration", minutes))))
                 : new Document("$add", List.of("$$m.summaryDuration", minutes));
 
-        Document monthsUpdated = new Document("$cond", List.of(
+        Document monthsUpdated = new Document(COND, List.of(
                 new Document("$in", List.of(month, "$$y.months.month")),
                 new Document("$map", new Document("input", "$$y.months").append("as", "m").append("in",
-                        new Document("$cond", List.of(
+                        new Document(COND, List.of(
                                 new Document("$eq", List.of("$$m.month", month)),
                                 new Document("month", month).append("summaryDuration", existingMonthDuration),
                                 "$$m")))),
@@ -44,10 +50,10 @@ public class TrainerWorkloadRepositoryImpl implements TrainerWorkloadRepositoryC
 
         Document yearsUpdated = new Document("$let", new Document()
                 .append("vars", new Document("yrs", new Document("$ifNull", List.of("$years", List.of()))))
-                .append("in", new Document("$cond", List.of(
+                .append("in", new Document(COND, List.of(
                         new Document("$in", List.of(year, "$$yrs.year")),
                         new Document("$map", new Document("input", "$$yrs").append("as", "y").append("in",
-                                new Document("$cond", List.of(
+                                new Document(COND, List.of(
                                         new Document("$eq", List.of("$$y.year", year)),
                                         new Document("year", year).append("months", monthsUpdated),
                                         "$$y")))),
@@ -56,12 +62,12 @@ public class TrainerWorkloadRepositoryImpl implements TrainerWorkloadRepositoryC
 
         List<Document> pipeline = List.of(
                 new Document("$set", new Document()
-                        .append("firstName", firstName)
-                        .append("lastName", lastName)
-                        .append("active", active)),
+                        .append("firstName", trainer.firstName())
+                        .append("lastName", trainer.lastName())
+                        .append("active", trainer.active())),
                 new Document("$set", new Document("years", yearsUpdated)));
 
         mongoTemplate.getCollection(mongoTemplate.getCollectionName(TrainerWorkload.class))
-                .updateOne(new Document("_id", username), pipeline, new UpdateOptions().upsert(true));
+                .updateOne(new Document("_id", trainer.username()), pipeline, new UpdateOptions().upsert(true));
     }
 }

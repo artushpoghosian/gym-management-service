@@ -3,8 +3,8 @@ package com.gym.rest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gym.config.TestSecurityConfig;
 import com.gym.rest.dto.auth.LoginRequestDto;
-import com.gym.security.JwtAuthenticationFilter;
 import com.gym.security.GymUserDetailsService;
+import com.gym.security.JwtAuthenticationFilter;
 import com.gym.security.JwtService;
 import com.gym.security.LoginAttemptService;
 import com.gym.security.TokenBlacklistService;
@@ -28,9 +28,15 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthEndpoint.class)
 @Import({JwtAuthenticationFilter.class, TestSecurityConfig.class})

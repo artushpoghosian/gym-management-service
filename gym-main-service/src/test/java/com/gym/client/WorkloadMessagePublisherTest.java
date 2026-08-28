@@ -12,7 +12,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,6 +49,6 @@ class WorkloadMessagePublisherTest {
     void publish_SendsToQueueWithPostProcessor() {
         publisher.publish(request);
 
-        verify(jmsTemplate).convertAndSend(eq(QUEUE), eq(request), eq(postProcessor));
+        verify(jmsTemplate).convertAndSend(QUEUE, request, postProcessor);
     }
 }

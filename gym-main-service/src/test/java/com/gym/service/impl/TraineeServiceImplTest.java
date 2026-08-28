@@ -29,7 +29,6 @@ import java.util.function.Predicate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -226,6 +225,8 @@ class TraineeServiceImplTest {
         when(traineeDao.findById(targetUser)).thenReturn(Optional.of(targetTrainee));
 
         traineeService.setActive(authUser, authPass, targetUser, true);
+
+        verify(traineeDao).updateStatus(targetUser, true);
     }
 
     @Test
@@ -382,8 +383,9 @@ class TraineeServiceImplTest {
         mockAuthenticationSuccess();
         String targetUser = "target.trainee";
         when(traineeDao.findById(targetUser)).thenReturn(Optional.empty());
+        List<String> trainerUsernames = List.of("trainer1");
 
-        assertThatThrownBy(() -> traineeService.updateTrainersList(authUser, authPass, targetUser, List.of("trainer1")))
+        assertThatThrownBy(() -> traineeService.updateTrainersList(authUser, authPass, targetUser, trainerUsernames))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("Trainee not found");
     }
@@ -395,8 +397,9 @@ class TraineeServiceImplTest {
         Trainee targetTrainee = new Trainee();
         when(traineeDao.findById(targetUser)).thenReturn(Optional.of(targetTrainee));
         when(trainerDao.findById("unknown.trainer")).thenReturn(Optional.empty());
+        List<String> trainerUsernames = List.of("unknown.trainer");
 
-        assertThatThrownBy(() -> traineeService.updateTrainersList(authUser, authPass, targetUser, List.of("unknown.trainer")))
+        assertThatThrownBy(() -> traineeService.updateTrainersList(authUser, authPass, targetUser, trainerUsernames))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("Trainer not found");
     }

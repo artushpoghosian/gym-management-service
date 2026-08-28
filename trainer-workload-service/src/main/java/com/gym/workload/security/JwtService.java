@@ -9,7 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
-import java.util.Date;
+import java.time.Instant;
 import java.util.HexFormat;
 
 @Service
@@ -28,8 +28,8 @@ public class JwtService {
 
     public boolean isValid(String token) {
         try {
-            Date expiration = parseClaims(token).getExpiration();
-            return expiration.after(new Date());
+            Instant expiration = parseClaims(token).getExpiration().toInstant();
+            return expiration.isAfter(Instant.now());
         } catch (JwtException | IllegalArgumentException e) {
             log.warn("Invalid JWT token: {}", e.getMessage());
             return false;

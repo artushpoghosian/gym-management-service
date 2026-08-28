@@ -3,10 +3,8 @@ package com.gym.rest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.gym.config.TestSecurityConfig;
-import com.gym.security.JwtAuthenticationFilter;
 import com.gym.exception.AuthenticationException;
 import com.gym.exception.GlobalExceptionHandler;
-import com.gym.exception.ValidationException;
 import com.gym.facade.GymFacade;
 import com.gym.model.Trainee;
 import com.gym.model.Trainer;
@@ -14,6 +12,7 @@ import com.gym.model.Training;
 import com.gym.model.TrainingType;
 import com.gym.rest.dto.training.TrainingRequestDto;
 import com.gym.security.GymUserDetailsService;
+import com.gym.security.JwtAuthenticationFilter;
 import com.gym.security.JwtService;
 import com.gym.security.TokenBlacklistService;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,13 +32,25 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDate;
 import java.util.Optional;
 
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.mockito.Mockito.argThat;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(TrainingEndpoint.class)
 @Import({JwtAuthenticationFilter.class, GlobalExceptionHandler.class, TestSecurityConfig.class})

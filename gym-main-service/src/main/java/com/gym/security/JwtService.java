@@ -9,10 +9,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Date;
 import java.util.HexFormat;
 
 @Service
@@ -61,8 +61,9 @@ public class JwtService {
         Instant now = clock.instant();
         return Jwts.builder()
                 .subject(subject)
-                .issuedAt(Timestamp.from(now))
-                .expiration(Timestamp.from(now.plus(ttl)))
+                // JJWT 0.12 takes java.util.Date here; everything internal stays Instant/Clock
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plus(ttl)))
                 .signWith(signingKey)
                 .compact();
     }

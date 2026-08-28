@@ -8,6 +8,5 @@ public interface TrainerWorkloadRepositoryCustom {
 
     Optional<TrainerWorkload> findByUsername(String username);
 
-    void applyWorkload(String username, String firstName, String lastName, boolean active,
-                       int year, int month, long minutes, boolean subtract);
+    void applyWorkload(TrainerInfo trainer, WorkloadDelta delta);
 }

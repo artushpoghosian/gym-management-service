@@ -1,9 +1,9 @@
 package com.gym.workload.rest;
 
+import com.gym.workload.config.TestSecurityConfig;
 import com.gym.workload.document.MonthSummary;
 import com.gym.workload.document.TrainerWorkload;
 import com.gym.workload.document.YearSummary;
-import com.gym.workload.config.TestSecurityConfig;
 import com.gym.workload.repository.TrainerWorkloadRepository;
 import com.gym.workload.security.JwtAuthenticationFilter;
 import com.gym.workload.security.JwtService;

@@ -148,8 +148,8 @@ class TrainerWorkloadRepositoryTest {
 
     @Test
     void apply_refreshesPersonalDataOnEveryCall() {
-        repository.applyWorkload(USERNAME, "Jane", "Doe", true, 2026, 7, 60L, false);
-        repository.applyWorkload(USERNAME, "Jane", "Smith", false, 2026, 7, 30L, false);
+        repository.applyWorkload(new TrainerInfo(USERNAME, "Jane", "Doe", true), new WorkloadDelta(2026, 7, 60L, false));
+        repository.applyWorkload(new TrainerInfo(USERNAME, "Jane", "Smith", false), new WorkloadDelta(2026, 7, 30L, false));
 
         TrainerWorkload doc = repository.findByUsername(USERNAME).orElseThrow();
         assertThat(doc.getFirstName()).isEqualTo("Jane");
@@ -159,11 +159,11 @@ class TrainerWorkloadRepositoryTest {
     }
 
     private void add(int year, int month, long minutes) {
-        repository.applyWorkload(USERNAME, "Jane", "Doe", true, year, month, minutes, false);
+        repository.applyWorkload(new TrainerInfo(USERNAME, "Jane", "Doe", true), new WorkloadDelta(year, month, minutes, false));
     }
 
     private void delete(int year, int month, long minutes) {
-        repository.applyWorkload(USERNAME, "Jane", "Doe", true, year, month, minutes, true);
+        repository.applyWorkload(new TrainerInfo(USERNAME, "Jane", "Doe", true), new WorkloadDelta(year, month, minutes, true));
     }
 
     private long monthTotal(int year, int month) {
